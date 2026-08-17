@@ -87,7 +87,12 @@ async function box(page, sel) {
   const cardsInSidebar = await page.$$eval('.sidebar-controls .control-card', (els) => els.map((e) => e.id));
   check('侧栏含 4 张控制卡片', cardsInSidebar.length === 4, cardsInSidebar.join(','));
   check('含 autoNextCard', cardsInSidebar.includes('autoNextCard'));
+  check('含 accidentalsCard', cardsInSidebar.includes('accidentalsCard'));
+  check('含 autoRevealCard', cardsInSidebar.includes('autoRevealCard'));
   check('含 difficultyCard', cardsInSidebar.includes('difficultyCard'));
+  check('卡片顺序：自动切换 → 包含升降号 → 自动显示答案 → 练习难度',
+    JSON.stringify(cardsInSidebar) === JSON.stringify(['autoNextCard', 'accidentalsCard', 'autoRevealCard', 'difficultyCard']),
+    cardsInSidebar.join(' > '));
 
   // 指板在主区右侧
   const fret = await box(page, '.fretboard-section');
