@@ -43,29 +43,29 @@ async function stringInRangeNotDimmed(page, idx, maxFret) {
   });
   assert(defaultInactive, "默认六弦按钮全部 inactive（灰），无自动点亮");
 
-  // 2. 浏览模式不应用难度筛选：全部 150 格均不 dimmed
+  // 2. 核对模式不应用难度筛选：全部 150 格均不 dimmed
   let dim = await dimmedCount(page);
-  assert(dim === 0, `浏览模式默认 dimmed=0（实际 ${dim}）`);
+  assert(dim === 0, `核对模式默认 dimmed=0（实际 ${dim}）`);
 
-  // 3. 浏览模式：难度卡片 disabled，弦按钮不可点击
+  // 3. 核对模式：难度卡片 disabled，弦按钮不可点击
   const browseDisabled = await page.evaluate(() =>
     document.querySelector("#difficultyCard").classList.contains("disabled"));
-  assert(browseDisabled, "浏览模式下难度卡片为 disabled");
+  assert(browseDisabled, "核对模式下难度卡片为 disabled");
   const pointerNone = await page.evaluate(() => {
     const cs = getComputedStyle(document.querySelector("#stringButtons .string-btn"));
     return cs.pointerEvents === "none";
   });
-  assert(pointerNone, "浏览模式下弦按钮 pointer-events:none（禁止点击）");
+  assert(pointerNone, "核对模式下弦按钮 pointer-events:none（禁止点击）");
 
-  // 4. 切到练习模式（默认空集）：全部 150 格 dimmed（默认全灰）
+  // 4. 切到点按模式（默认空集）：全部 150 格 dimmed（默认全灰）
   await page.click("#practiceModeTab");
   await page.waitForTimeout(400);
   const practiceEnabled = await page.evaluate(() =>
     !document.querySelector("#difficultyCard").classList.contains("disabled"));
-  assert(practiceEnabled, "练习模式下难度卡片启用");
+  assert(practiceEnabled, "点按模式下难度卡片启用");
   dim = await dimmedCount(page);
-  assert(dim === 150, `练习模式默认空集 dimmed=150（实际 ${dim}）`);
-  assert((await activeStrings(page)).length === 0, "练习模式初始仍无任何弦被选中");
+  assert(dim === 150, `点按模式默认空集 dimmed=150（实际 ${dim}）`);
+  assert((await activeStrings(page)).length === 0, "点按模式初始仍无任何弦被选中");
 
   // 5. 点击「一弦」→ 选中；仅一弦 0-12 品未 dimmed；dim = 150 - 13 = 137
   await page.click('#stringButtons .string-btn[data-string="1"]');

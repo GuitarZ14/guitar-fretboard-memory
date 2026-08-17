@@ -681,7 +681,7 @@ function setMode(mode) {
     mode === "practice"
       ? "点击指板上对应位置作答，答完自动进入下一题。"
       : "在吉他上弹出这个音的任意位置，然后查看答案。";
-  elements.sectionKicker.textContent = mode === "practice" ? "练习区域" : "答案区域";
+  elements.sectionKicker.textContent = mode === "practice" ? "点按区域" : "核对区域";
 
   if (state.summaryOpen) closeSummary();
 

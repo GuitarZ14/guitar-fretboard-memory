@@ -144,19 +144,19 @@ async function box(page, sel) {
   const accAfter = await page.$eval('#accidentalsToggle', (el) => el.checked);
   check('升降号开关可切换', accBefore !== accAfter, `${accBefore} → ${accAfter}`);
 
-  // 浏览模式：难度卡片禁用；练习模式：启用 + 高亮
+  // 核对模式：难度卡片禁用；点按模式：启用 + 高亮
   const browseDisabled = await page.$eval('#difficultyCard', (el) => el.classList.contains('disabled'));
-  check('默认（浏览）模式 → 难度卡片禁用', browseDisabled);
+  check('默认（核对）模式 → 难度卡片禁用', browseDisabled);
   await page.click('#practiceModeTab');
   await page.waitForTimeout(900); // 等待禁用态 opacity 过渡与高亮
   const practiceState = await page.evaluate(() => {
     const el = document.querySelector('#difficultyCard');
     return { disabled: el.classList.contains('disabled'), highlight: el.classList.contains('highlight') };
   });
-  check('切换到练习模式 → 难度卡片启用', practiceState.disabled === false);
-  check('切换到练习模式 → 难度卡片高亮', practiceState.highlight === true);
+  check('切换到点按模式 → 难度卡片启用', practiceState.disabled === false);
+  check('切换到点按模式 → 难度卡片高亮', practiceState.highlight === true);
 
-  // 难度滑块在练习模式可拖动并置灰指板
+  // 难度滑块在点按模式可拖动并置灰指板
   await page.$eval('#fretRangeMaxInput', (el) => { el.value = 5; el.dispatchEvent(new Event('input', { bubbles: true })); });
   await page.waitForTimeout(300);
   const dimmed = await page.$$eval('.fretboard .fret-cell.dimmed', (els) => els.length);

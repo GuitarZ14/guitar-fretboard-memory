@@ -184,13 +184,13 @@
           <section class="fretboard-section brutal-shadow reveal" aria-labelledby="fretboard-title">
             <div class="section-heading">
               <div>
-                <p class="section-kicker" id="sectionKicker">练习区域</p>
+                <p class="section-kicker" id="sectionKicker">核对区域</p>
                 <h1 id="fretboard-title">六弦吉他指板</h1>
               </div>
 
-              <div class="mode-tabs" role="tablist" aria-label="练习模式">
-                <button class="mode-tab active" id="browseModeTab" type="button" role="tab" aria-selected="true" data-mode="browse">浏览</button>
-                <button class="mode-tab" id="practiceModeTab" type="button" role="tab" aria-selected="false" data-mode="practice">练习</button>
+              <div class="mode-tabs" role="tablist" aria-label="模式切换（核对 / 点按）">
+                <button class="mode-tab active" id="browseModeTab" type="button" role="tab" aria-selected="true" data-mode="browse">核对</button>
+                <button class="mode-tab" id="practiceModeTab" type="button" role="tab" aria-selected="false" data-mode="practice">点按</button>
               </div>
 
               <div class="answer-status" id="answerStatus">
@@ -242,7 +242,7 @@
       </div>
     </div>
 
-    <script src="app.js?v=7"></script>
+    <script src="app.js?v=8"></script>
     <script>
       // 滚动触发入场动画：进入视口时添加 .in-view（播放一次）
       (function () {
