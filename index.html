@@ -9,7 +9,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="styles.css?v=8" />
+    <link rel="stylesheet" href="styles.css?v=9" />
   </head>
   <body>
     <main class="app-shell">
@@ -109,7 +109,7 @@
               <div class="control-icon" aria-hidden="true">▤</div>
               <div>
                 <h2>练习难度</h2>
-                <p>拖动滑块设定出题的品格区间</p>
+                <p>设定出题的弦组与品格区间</p>
               </div>
             </div>
             <div class="fret-range-slider" role="group" aria-label="品格范围选择">
@@ -129,6 +129,21 @@
                 <span>0</span>
                 <span>12</span>
                 <span>24</span>
+              </div>
+            </div>
+
+            <div class="string-select-block">
+              <div class="string-select-head">
+                <span class="string-select-label">选择弦组</span>
+                <span class="string-select-hint">可单选或多选</span>
+              </div>
+              <div class="string-buttons" id="stringButtons" role="group" aria-label="弦组选择">
+                <button type="button" class="string-btn" data-string="1">一弦</button>
+                <button type="button" class="string-btn" data-string="2">二弦</button>
+                <button type="button" class="string-btn" data-string="3">三弦</button>
+                <button type="button" class="string-btn" data-string="4">四弦</button>
+                <button type="button" class="string-btn" data-string="5">五弦</button>
+                <button type="button" class="string-btn" data-string="6">六弦</button>
               </div>
             </div>
           </article>
@@ -227,7 +242,7 @@
       </div>
     </div>
 
-    <script src="app.js?v=5"></script>
+    <script src="app.js?v=6"></script>
     <script>
       // 滚动触发入场动画：进入视口时添加 .in-view（播放一次）
       (function () {

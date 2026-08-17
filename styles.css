@@ -406,6 +406,32 @@ button { color: inherit; cursor: pointer; }
 
 /* 品格区间双滑块 */
 .fret-range-slider { margin-top: 10px; }
+.string-select-block { margin-top: 14px; }
+.string-select-head {
+  display: flex; align-items: baseline; justify-content: space-between;
+  gap: 8px; margin-bottom: 8px;
+}
+.string-select-label { font-size: 11px; font-weight: 700; color: var(--text); }
+.string-select-hint { font-size: 10px; font-weight: 500; color: var(--text-3); }
+.string-buttons { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.string-btn {
+  appearance: none; -webkit-appearance: none;
+  border: 2px solid rgba(255, 255, 255, 0.7);
+  border-radius: 12px; padding: 9px 0; font-family: var(--font);
+  font-size: 12px; font-weight: 600; cursor: pointer; color: var(--text-3);
+  background: #f1f3f8;
+  box-shadow: inset 1px 1px 2px rgba(0, 0, 0, 0.04), inset -1px -1px 2px rgba(255, 255, 255, 0.85);
+  transition: transform .15s ease, box-shadow .2s ease, background .2s ease, color .2s ease;
+}
+.string-btn:hover { transform: translateY(-2px); }
+.string-btn:active { transform: translateY(1px); }
+.string-btn.active {
+  color: #2f5a6e; font-weight: 700;
+  background: linear-gradient(145deg, #ADD8E6, #9bc5d9);
+  border-color: rgba(255, 255, 255, 0.8);
+  box-shadow: 3px 3px 0 rgba(173, 216, 230, 0.35), inset -1px -1px 2px rgba(0, 0, 0, 0.06), inset 1px 1px 2px rgba(255, 255, 255, 0.6);
+}
+.string-btn:focus-visible { outline: 3px solid var(--purple-400); outline-offset: 2px; }
 .range-values {
   display: flex; align-items: baseline; justify-content: center; gap: 4px; margin-bottom: 10px;
   font-size: 20px; font-weight: 800; color: var(--text);

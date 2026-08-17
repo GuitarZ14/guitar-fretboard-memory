@@ -28,6 +28,7 @@ const NOTES = [
 const ROUND_STORAGE_KEY = "guitar-fretboard-round-count";
 const BEST_STORAGE_PREFIX = "guitar-fretboard-best-";
 const FRET_RANGE_STORAGE_KEY = "guitar-fretboard-fret-range";
+const STRING_STORAGE_KEY = "guitar-fretboard-strings";
 const MIN_FRET = 0;
 const MAX_FRET = 24;
 const DEFAULT_FRET_RANGE = { min: MIN_FRET, max: 12 };
@@ -110,6 +111,8 @@ const STRINGS = [
   { name: CHROMATIC[9], pitch: 9, size: 3.0 }, // 5弦 A
   { name: CHROMATIC[4], pitch: 4, size: 3.6 }, // 6弦 低音 E
 ];
+// 弦序号 1-6（索引 0 = 一弦高音E … 索引 5 = 六弦低音E）
+const ALL_STRINGS = STRINGS.map((_, index) => index + 1);
 
 // 练习难度现在由用户通过双滑块自由设定品格区间 [minFret, maxFret]
 function loadFretRange() {
@@ -134,6 +137,27 @@ function loadFretRange() {
 function saveFretRange(range) {
   try {
     localStorage.setItem(FRET_RANGE_STORAGE_KEY, JSON.stringify(range));
+  } catch {
+    // ignore
+  }
+}
+
+// 练习难度：用户可单独或组合勾选琴弦（1-6）。默认全部选中。
+function loadStrings() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(STRING_STORAGE_KEY));
+    if (Array.isArray(saved) && saved.length > 0 && saved.every((n) => ALL_STRINGS.includes(Number(n)))) {
+      return saved.map(Number).sort((a, b) => a - b);
+    }
+  } catch {
+    // fall back to default
+  }
+  return [...ALL_STRINGS];
+}
+
+function saveStrings(strings) {
+  try {
+    localStorage.setItem(STRING_STORAGE_KEY, JSON.stringify(strings));
   } catch {
     // ignore
   }
@@ -189,6 +213,7 @@ const state = {
     started: false,
     accidentals: false,
     fretRange: { ...initialFretRange },
+    strings: loadStrings(),
     roundTotal: 0,
     roundStartedAt: 0,
     completed: 0,
@@ -228,6 +253,7 @@ const elements = {
   fretRangeMinInput: document.querySelector("#fretRangeMinInput"),
   fretRangeMaxInput: document.querySelector("#fretRangeMaxInput"),
   fretRangeFill: document.querySelector("#fretRangeFill"),
+  stringButtons: document.querySelectorAll("#stringButtons .string-btn"),
   browseModeTab: document.querySelector("#browseModeTab"),
   practiceModeTab: document.querySelector("#practiceModeTab"),
   practiceStats: document.querySelector("#practiceStats"),
@@ -272,6 +298,7 @@ function buildFretboard() {
       cell.style.gridColumn = String(fret + 1);
       cell.style.gridRow = String(row);
       cell.dataset.string = string.name;
+      cell.dataset.stringIndex = String(stringIndex + 1);
       cell.dataset.fret = String(fret);
 
       if (fret === 0) {
@@ -388,12 +415,14 @@ function getPracticeNotes() {
     ? NOTES
     : NOTES.filter((note) => NATURAL_NOTE_KEYS.has(note.key));
   const { min, max } = state.practice.fretRange;
+  const strings = state.practice.strings;
 
-  // 只保留在当前品格区间内至少有一个位置的音名
+  // 只保留在「选中弦组 + 当前品格区间」内至少有一个位置的音名
   return base.filter((note) =>
-    STRINGS.some((string) => {
+    strings.some((stringIndex) => {
+      const pitch = STRINGS[stringIndex - 1].pitch;
       for (let fret = min; fret <= max; fret += 1) {
-        if (CHROMATIC[(string.pitch + fret) % 12] === note.pitch) return true;
+        if (CHROMATIC[(pitch + fret) % 12] === note.pitch) return true;
       }
       return false;
     }),
@@ -403,7 +432,8 @@ function getPracticeNotes() {
 function getBestKey() {
   const { min, max } = state.practice.fretRange;
   const acc = state.practice.accidentals ? 1 : 0;
-  return `${min}-${max}-${acc}`;
+  const str = state.practice.strings.slice().sort().join("");
+  return `${min}-${max}-${str}-${acc}`;
 }
 
 function getBestForDifficulty() {
@@ -424,10 +454,15 @@ function updateStats() {
 }
 
 function updateDimmedCells() {
-  const { min, max } = state.mode === "practice" ? state.practice.fretRange : { min: MIN_FRET, max: MAX_FRET };
+  const practice = state.mode === "practice";
+  const { min, max } = practice ? state.practice.fretRange : { min: MIN_FRET, max: MAX_FRET };
+  const activeStrings = practice ? state.practice.strings : ALL_STRINGS;
   document.querySelectorAll(".fret-cell").forEach((cell) => {
     const fret = Number(cell.dataset.fret);
-    cell.classList.toggle("dimmed", fret < min || fret > max);
+    const stringIndex = Number(cell.dataset.stringIndex);
+    const inRange = fret >= min && fret <= max;
+    const inStrings = activeStrings.includes(stringIndex);
+    cell.classList.toggle("dimmed", !(inRange && inStrings));
   });
 }
 
@@ -696,6 +731,37 @@ function syncControlState() {
   if (!elements.autoRevealToggle.checked) elements.revealProgress.style.width = "0";
 }
 
+/* ---------- 弦组多选 ---------- */
+
+function renderStringButtons() {
+  elements.stringButtons.forEach((btn) => {
+    const num = Number(btn.dataset.string);
+    const active = state.practice.strings.includes(num);
+    btn.classList.toggle("active", active);
+    btn.setAttribute("aria-pressed", String(active));
+  });
+}
+
+function toggleString(num) {
+  // 弦组属于练习难度，仅练习模式生效；浏览模式下卡片已禁用，此处再兜底拦截
+  if (state.mode !== "practice") return;
+
+  const idx = state.practice.strings.indexOf(num);
+  if (idx >= 0) {
+    if (state.practice.strings.length === 1) return; // 至少保留一根弦
+    state.practice.strings.splice(idx, 1);
+  } else {
+    state.practice.strings.push(num);
+  }
+  state.practice.strings.sort((a, b) => a - b);
+  saveStrings(state.practice.strings);
+  renderStringButtons();
+  updateDimmedCells();
+
+  clearTimeout(state.practice.advanceTimer);
+  startPracticeRound();
+}
+
 function timerLoop(now) {
   const elapsed = now - state.startedAt;
   const practice = state.mode === "practice";
@@ -773,6 +839,10 @@ elements.summaryAgain.addEventListener("click", () => {
   });
 });
 
+elements.stringButtons.forEach((btn) => {
+  btn.addEventListener("click", () => toggleString(Number(btn.dataset.string)));
+});
+
 document.querySelectorAll("[data-step-target]").forEach((button) => {
   button.addEventListener("click", () => {
     const input = document.querySelector(`#${button.dataset.stepTarget}`);
@@ -802,6 +872,7 @@ renderCurrentNote();
 elements.roundCount.textContent = String(state.round).padStart(2, "0");
 updateMatches();
 renderFretRangeInputs();
+renderStringButtons();
 updateDimmedCells();
 syncControlState();
 state.animationFrame = requestAnimationFrame(timerLoop);
