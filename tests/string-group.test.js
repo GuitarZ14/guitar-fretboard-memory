@@ -11,17 +11,19 @@ function assert(cond, msg) {
 async function dimmedCount(page) {
   return page.evaluate(() => document.querySelectorAll(".fret-cell.dimmed").length);
 }
-async function stringCellsDimmed(page, idx) {
-  return page.evaluate((i) => {
-    const cells = [...document.querySelectorAll(`.fret-cell[data-string-index="${i}"]`)];
-    return cells.every((c) => c.classList.contains("dimmed"));
-  }, idx);
+async function activeStrings(page) {
+  return page.evaluate(() =>
+    [...document.querySelectorAll("#stringButtons .string-btn")]
+      .filter((b) => b.classList.contains("active"))
+      .map((b) => b.dataset.string)
+      .sort());
 }
-async function stringCellsNotDimmed(page, idx) {
-  return page.evaluate((i) => {
-    const cells = [...document.querySelectorAll(`.fret-cell[data-string-index="${i}"]`)];
-    return cells.every((c) => !c.classList.contains("dimmed"));
-  }, idx);
+async function stringInRangeNotDimmed(page, idx, maxFret) {
+  return page.evaluate(({ i, max }) => {
+    const cells = [...document.querySelectorAll(`.fret-cell[data-string-index="${i}"]`)]
+      .filter((c) => Number(c.dataset.fret) <= max);
+    return cells.length > 0 && cells.every((c) => !c.classList.contains("dimmed"));
+  }, { i: idx, max: maxFret });
 }
 
 (async () => {
@@ -34,10 +36,12 @@ async function stringCellsNotDimmed(page, idx) {
   await page.goto(URL, { waitUntil: "networkidle" });
   await page.waitForSelector("#stringButtons .string-btn");
 
-  // 1. 默认六弦全选中
-  const allActive = await page.evaluate(() =>
-    [...document.querySelectorAll("#stringButtons .string-btn")].every((b) => b.classList.contains("active")));
-  assert(allActive, "默认六弦按钮全部 active");
+  // 1. 默认六弦全部未选中（灰色）
+  const defaultInactive = await page.evaluate(() => {
+    const btns = [...document.querySelectorAll("#stringButtons .string-btn")];
+    return btns.length === 6 && btns.every((b) => !b.classList.contains("active"));
+  });
+  assert(defaultInactive, "默认六弦按钮全部 inactive（灰），无自动点亮");
 
   // 2. 浏览模式不应用难度筛选：全部 150 格均不 dimmed
   let dim = await dimmedCount(page);
@@ -53,68 +57,51 @@ async function stringCellsNotDimmed(page, idx) {
   });
   assert(pointerNone, "浏览模式下弦按钮 pointer-events:none（禁止点击）");
 
-  // 4. 切到练习模式
+  // 4. 切到练习模式（默认空集）：全部 150 格 dimmed（默认全灰）
   await page.click("#practiceModeTab");
   await page.waitForTimeout(400);
   const practiceEnabled = await page.evaluate(() =>
     !document.querySelector("#difficultyCard").classList.contains("disabled"));
   assert(practiceEnabled, "练习模式下难度卡片启用");
-
-  // 4b. 练习模式全选 0-12 品：dimmed = 150 - 6*13 = 72
   dim = await dimmedCount(page);
-  assert(dim === 72, `练习模式全选 0-12 时 dimmed=72（实际 ${dim}）`);
+  assert(dim === 150, `练习模式默认空集 dimmed=150（实际 ${dim}）`);
+  assert((await activeStrings(page)).length === 0, "练习模式初始仍无任何弦被选中");
 
-  // 5. 取消「三弦」
-  await page.click('#stringButtons .string-btn[data-string="3"]');
+  // 5. 点击「一弦」→ 选中；仅一弦 0-12 品未 dimmed；dim = 150 - 13 = 137
+  await page.click('#stringButtons .string-btn[data-string="1"]');
   await page.waitForTimeout(300);
-  const threeInactive = await page.evaluate(() =>
-    !document.querySelector('#stringButtons .string-btn[data-string="3"]').classList.contains("active"));
-  assert(threeInactive, "点击后三弦按钮变为 inactive");
-
-  // 6. 三弦全部 dimmed；一弦在 0-12 品范围内未 dimmed（超出范围的格子仍灰化）
-  assert(await stringCellsDimmed(page, 3), "三弦（stringIndex=3）全部 dimmed");
-  const oneInRange = await page.evaluate(() => {
-    const cells = [...document.querySelectorAll('.fret-cell[data-string-index="1"]')]
-      .filter((c) => Number(c.dataset.fret) <= 12);
-    return cells.length > 0 && cells.every((c) => !c.classList.contains("dimmed"));
-  });
-  assert(oneInRange, "一弦 0-12 品范围未 dimmed");
-  // dimmed 数 = 150 - 5*13 = 85
+  assert(JSON.stringify(await activeStrings(page)) === JSON.stringify(["1"]), "点击后仅一弦 active");
+  assert(await stringInRangeNotDimmed(page, 1, 12), "一弦 0-12 品范围未 dimmed");
   dim = await dimmedCount(page);
-  assert(dim === 85, `取消三弦后 dimmed=85（实际 ${dim}）`);
+  assert(dim === 137, `选一弦后 dimmed=137（实际 ${dim}）`);
 
-  // 7. 组合取消「四弦」，一二弦保持，三四弦 dimmed
-  await page.click('#stringButtons .string-btn[data-string="4"]');
+  // 6. 多选「二弦」→ 一、二弦 active；dim = 150 - 2*13 = 124
+  await page.click('#stringButtons .string-btn[data-string="2"]');
   await page.waitForTimeout(300);
-  assert(await stringCellsDimmed(page, 4), "四弦（stringIndex=4）全部 dimmed");
+  assert(JSON.stringify(await activeStrings(page)) === JSON.stringify(["1", "2"]), "多选后一、二弦均 active");
   dim = await dimmedCount(page);
-  assert(dim === 98, `取消三四弦后 dimmed=98（实际 ${dim}）`);
+  assert(dim === 124, `选一、二弦后 dimmed=124（实际 ${dim}）`);
 
-  // 8. 至少保留一根弦：从当前状态逐步取消，直到只剩 1 根，最后一根点击无效
-  while (true) {
-    const active = await page.evaluate(() =>
-      [...document.querySelectorAll("#stringButtons .string-btn")].filter((b) => b.classList.contains("active")).map((b) => b.dataset.string));
-    if (active.length <= 1) break;
-    await page.click(`#stringButtons .string-btn[data-string="${active[0]}"]`);
-    await page.waitForTimeout(100);
-  }
-  const remaining = await page.evaluate(() =>
-    [...document.querySelectorAll("#stringButtons .string-btn")].filter((b) => b.classList.contains("active")).length);
-  assert(remaining === 1, `逐步取消后仅剩1根 active（实际 ${remaining}）`);
-  const last = await page.evaluate(() =>
-    [...document.querySelectorAll("#stringButtons .string-btn")].filter((b) => b.classList.contains("active"))[0].dataset.string);
-  await page.click(`#stringButtons .string-btn[data-string="${last}"]`);
-  await page.waitForTimeout(200);
-  const stillOne = await page.evaluate(() =>
-    [...document.querySelectorAll("#stringButtons .string-btn")].filter((b) => b.classList.contains("active")).length);
-  assert(stillOne === 1, "尝试取消最后一根弦被阻止，仍保留1根");
+  // 7. 取消「一弦」→ 仅二弦 active；dim = 150 - 13 = 137
+  await page.click('#stringButtons .string-btn[data-string="1"]');
+  await page.waitForTimeout(300);
+  assert(JSON.stringify(await activeStrings(page)) === JSON.stringify(["2"]), "取消一弦后仅二弦 active");
+  dim = await dimmedCount(page);
+  assert(dim === 137, `取消一弦后 dimmed=137（实际 ${dim}）`);
 
-  // 9. 持久化：reload 后保留此时选择（仅剩 last 弦）
+  // 8. 自由切换允许回到空集：取消最后一根 → 0 根；再次点击 → 1 根
+  await page.click('#stringButtons .string-btn[data-string="2"]');
+  await page.waitForTimeout(300);
+  assert((await activeStrings(page)).length === 0, "取消最后一根弦后被允许为空（0 根）");
+  await page.click('#stringButtons .string-btn[data-string="2"]');
+  await page.waitForTimeout(300);
+  assert((await activeStrings(page)).length === 1, "空集下再次点击可重新选中（1 根）");
+
+  // 9. 持久化子集：选中弦 2 后 reload，保留 1 根（非全选不被视为默认）
   await page.reload({ waitUntil: "networkidle" });
   await page.waitForSelector("#stringButtons .string-btn");
-  const persisted = await page.evaluate(() =>
-    [...document.querySelectorAll("#stringButtons .string-btn")].filter((b) => b.classList.contains("active")).length);
-  assert(persisted === 1, `reload 后弦组选择持久化（剩 ${persisted} 根）`);
+  const persisted = await activeStrings(page);
+  assert(persisted.length === 1 && persisted[0] === "2", `reload 后弦组选择持久化（剩 ${persisted.join(",")}）`);
 
   // 10. 无 console / page 错误
   assert(errors.length === 0, `无运行时错误（${errors.length} 条）` + (errors.length ? " -> " + errors.join(" | ") : ""));

@@ -142,17 +142,21 @@ function saveFretRange(range) {
   }
 }
 
-// 练习难度：用户可单独或组合勾选琴弦（1-6）。默认全部选中。
+// 练习难度：用户可单独或组合勾选琴弦（1-6）。
+// 默认「全灰、按需选择」——初始不点亮任何弦，由用户主动点击选取。
+// 历史存储若恰好等于「六根全选」，视为旧版默认（非用户显式选择），回落到空（全灰）。
 function loadStrings() {
   try {
     const saved = JSON.parse(localStorage.getItem(STRING_STORAGE_KEY));
     if (Array.isArray(saved) && saved.length > 0 && saved.every((n) => ALL_STRINGS.includes(Number(n)))) {
-      return saved.map(Number).sort((a, b) => a - b);
+      const nums = saved.map(Number).sort((a, b) => a - b);
+      const allSelected = nums.length === ALL_STRINGS.length && ALL_STRINGS.every((n) => nums.includes(n));
+      if (!allSelected) return nums;
     }
   } catch {
     // fall back to default
   }
-  return [...ALL_STRINGS];
+  return [];
 }
 
 function saveStrings(strings) {
@@ -578,7 +582,17 @@ function closeSummary() {
 function startPracticeRound() {
   state.practice.started = true;
   state.practice.accidentals = elements.accidentalsToggle.checked;
-  state.practice.roundTotal = getPracticeNotes().length;
+  const notes = getPracticeNotes();
+  // 弦组为空（默认全灰、用户尚未勾选）：提示先选择弦组，不进入出题，避免空集直接结算
+  if (notes.length === 0) {
+    setAnswerStatus("请在「选择弦组」中至少勾选一根弦，再开始练习。");
+    state.practice.roundTotal = 0;
+    state.noteQueue = [];
+    updateDimmedCells(); // 同步将指板全部灰化，呈现「默认全灰」状态
+    updateStats();
+    return;
+  }
+  state.practice.roundTotal = notes.length;
   state.practice.phase = "pending";
   state.practice.completed = 0;
   state.practice.firstTry = 0;
@@ -748,7 +762,6 @@ function toggleString(num) {
 
   const idx = state.practice.strings.indexOf(num);
   if (idx >= 0) {
-    if (state.practice.strings.length === 1) return; // 至少保留一根弦
     state.practice.strings.splice(idx, 1);
   } else {
     state.practice.strings.push(num);
