@@ -9,7 +9,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="styles.css?v=7" />
+    <link rel="stylesheet" href="styles.css?v=8" />
   </head>
   <body>
     <main class="app-shell">
@@ -27,182 +27,181 @@
         </div>
       </header>
 
-      <section class="hero" aria-labelledby="current-note-label">
-        <div class="hero-orbs" aria-hidden="true">
-          <span class="orb orb-1"></span>
-          <span class="orb orb-2"></span>
-          <span class="orb orb-3"></span>
-        </div>
-        <div class="eyebrow reveal fade-in stagger-1" id="current-note-label">
-          <span class="pulse-dot"></span>
-          当前音名
-        </div>
-
-        <div class="main-stage">
-          <aside class="stage-controls stage-controls-left" aria-label="快速设置">
-            <article class="control-card brutal-shadow reveal stagger-1" id="autoNextCard">
-              <div class="control-title-row">
-                <div class="control-icon" aria-hidden="true">↻</div>
-                <div>
-                  <h2>自动切换</h2>
-                  <p>每一拍抽取下一个音名</p>
-                </div>
-                <label class="switch">
-                  <input id="autoNextToggle" type="checkbox" />
-                  <span class="switch-track"><span class="switch-thumb"></span></span>
-                  <span class="sr-only">开启自动切换</span>
-                </label>
+      <!-- 方案三：桌面左右分栏 —— 左：练习设置侧栏；右：音名 + 指板 -->
+      <div class="layout-split">
+        <aside class="sidebar-controls reveal" aria-label="练习设置">
+          <article class="control-card brutal-shadow reveal stagger-1" id="autoNextCard">
+            <div class="control-title-row">
+              <div class="control-icon" aria-hidden="true">↻</div>
+              <div>
+                <h2>自动切换</h2>
+                <p>每一拍抽取下一个音名</p>
               </div>
-              <div class="setting-row" id="autoNextSetting">
-                <span>切换速度</span>
-                <div class="speed-fields">
-                  <div class="number-field">
-                    <button type="button" data-step-target="autoNextSeconds" data-step="-1" aria-label="减少切换秒数">−</button>
-                    <input id="autoNextSeconds" type="number" value="5" min="1" max="20" step="1" inputmode="numeric" aria-label="切换秒数" />
-                    <span>秒</span>
-                    <button type="button" data-step-target="autoNextSeconds" data-step="1" aria-label="增加切换秒数">＋</button>
-                  </div>
-                  <span class="equals">＝</span>
-                  <div class="number-field">
-                    <button type="button" data-step-target="autoNextBpm" data-step="-5" aria-label="降低 BPM">−</button>
-                    <input id="autoNextBpm" type="number" value="12" min="3" max="60" step="1" inputmode="numeric" aria-label="切换 BPM" />
-                    <span>BPM</span>
-                    <button type="button" data-step-target="autoNextBpm" data-step="5" aria-label="提高 BPM">＋</button>
-                  </div>
-                </div>
-              </div>
-              <div class="timer-track" aria-hidden="true"><span id="nextProgress"></span></div>
-            </article>
-
-            <article class="control-card brutal-shadow reveal stagger-2" id="autoRevealCard">
-              <div class="control-title-row">
-                <div class="control-icon" aria-hidden="true">◎</div>
-                <div>
-                  <h2>自动显示答案</h2>
-                  <p>抽取音名后延时显示所有位置</p>
-                </div>
-                <label class="switch">
-                  <input id="autoRevealToggle" type="checkbox" />
-                  <span class="switch-track"><span class="switch-thumb"></span></span>
-                  <span class="sr-only">开启自动显示答案</span>
-                </label>
-              </div>
-              <div class="setting-row" id="autoRevealSetting">
-                <label for="autoRevealSeconds">显示延时</label>
+              <label class="switch">
+                <input id="autoNextToggle" type="checkbox" />
+                <span class="switch-track"><span class="switch-thumb"></span></span>
+                <span class="sr-only">开启自动切换</span>
+              </label>
+            </div>
+            <div class="setting-row" id="autoNextSetting">
+              <span>切换速度</span>
+              <div class="speed-fields">
                 <div class="number-field">
-                  <button type="button" data-step-target="autoRevealSeconds" data-step="-1" aria-label="减少答案延时">−</button>
-                  <input id="autoRevealSeconds" type="number" value="5" min="1" max="60" inputmode="numeric" />
+                  <button type="button" data-step-target="autoNextSeconds" data-step="-1" aria-label="减少切换秒数">−</button>
+                  <input id="autoNextSeconds" type="number" value="5" min="1" max="20" step="1" inputmode="numeric" aria-label="切换秒数" />
                   <span>秒</span>
-                  <button type="button" data-step-target="autoRevealSeconds" data-step="1" aria-label="增加答案延时">＋</button>
+                  <button type="button" data-step-target="autoNextSeconds" data-step="1" aria-label="增加切换秒数">＋</button>
                 </div>
-              </div>
-              <div class="timer-track" aria-hidden="true"><span id="revealProgress"></span></div>
-            </article>
-
-          </aside>
-
-          <div class="note-column reveal scale-in stagger-2">
-            <div class="note-stage">
-              <div class="note-card brutal-shadow-lg" aria-live="assertive">
-                <span id="currentNote">C</span>
+                <span class="equals">＝</span>
+                <div class="number-field">
+                  <button type="button" data-step-target="autoNextBpm" data-step="-5" aria-label="降低 BPM">−</button>
+                  <input id="autoNextBpm" type="number" value="12" min="3" max="60" step="1" inputmode="numeric" aria-label="切换 BPM" />
+                  <span>BPM</span>
+                  <button type="button" data-step-target="autoNextBpm" data-step="5" aria-label="提高 BPM">＋</button>
+                </div>
               </div>
             </div>
-            <div class="note-actions">
-              <button class="side-action reveal-action brutal-shadow brutal-shadow-hover" id="revealButton" type="button">
-                <span class="action-icon" aria-hidden="true">◉</span>
-                <span>显示答案</span>
-              </button>
-              <button class="side-action next-action brutal-shadow brutal-shadow-hover" id="nextButton" type="button">
-                <span class="action-icon" aria-hidden="true">→</span>
-                <span>下一个音</span>
-              </button>
+            <div class="timer-track" aria-hidden="true"><span id="nextProgress"></span></div>
+          </article>
+
+          <article class="control-card brutal-shadow reveal stagger-2" id="autoRevealCard">
+            <div class="control-title-row">
+              <div class="control-icon" aria-hidden="true">◎</div>
+              <div>
+                <h2>自动显示答案</h2>
+                <p>抽取音名后延时显示所有位置</p>
+              </div>
+              <label class="switch">
+                <input id="autoRevealToggle" type="checkbox" />
+                <span class="switch-track"><span class="switch-thumb"></span></span>
+                <span class="sr-only">开启自动显示答案</span>
+              </label>
             </div>
-            <p class="instruction" id="instruction">在吉他上弹出这个音的任意位置，然后查看答案。</p>
-          </div>
-
-          <aside class="stage-controls stage-controls-right" aria-label="练习设置">
-            <article class="control-card accidental-card brutal-shadow reveal stagger-1" id="accidentalsCard">
-              <div class="control-title-row">
-                <div class="control-icon" aria-hidden="true">♯♭</div>
-                <div>
-                  <h2>包含升降号</h2>
-                  <p>开启后加入升号音和降号音</p>
-                </div>
-                <label class="switch">
-                  <input id="accidentalsToggle" type="checkbox" checked />
-                  <span class="switch-track"><span class="switch-thumb"></span></span>
-                  <span class="sr-only">题库包含升降号</span>
-                </label>
+            <div class="setting-row" id="autoRevealSetting">
+              <label for="autoRevealSeconds">显示延时</label>
+              <div class="number-field">
+                <button type="button" data-step-target="autoRevealSeconds" data-step="-1" aria-label="减少答案延时">−</button>
+                <input id="autoRevealSeconds" type="number" value="5" min="1" max="60" inputmode="numeric" />
+                <span>秒</span>
+                <button type="button" data-step-target="autoRevealSeconds" data-step="1" aria-label="增加答案延时">＋</button>
               </div>
-            </article>
+            </div>
+            <div class="timer-track" aria-hidden="true"><span id="revealProgress"></span></div>
+          </article>
 
-            <article class="control-card difficulty-card brutal-shadow reveal stagger-2" id="difficultyCard">
-              <div class="control-title-row">
-                <div class="control-icon" aria-hidden="true">▤</div>
-                <div>
-                  <h2>练习难度</h2>
-                  <p>拖动滑块设定出题的品格区间</p>
+          <article class="control-card accidental-card brutal-shadow reveal stagger-1" id="accidentalsCard">
+            <div class="control-title-row">
+              <div class="control-icon" aria-hidden="true">♯♭</div>
+              <div>
+                <h2>包含升降号</h2>
+                <p>开启后加入升号音和降号音</p>
+              </div>
+              <label class="switch">
+                <input id="accidentalsToggle" type="checkbox" checked />
+                <span class="switch-track"><span class="switch-thumb"></span></span>
+                <span class="sr-only">题库包含升降号</span>
+              </label>
+            </div>
+          </article>
+
+          <article class="control-card difficulty-card brutal-shadow reveal stagger-2" id="difficultyCard">
+            <div class="control-title-row">
+              <div class="control-icon" aria-hidden="true">▤</div>
+              <div>
+                <h2>练习难度</h2>
+                <p>拖动滑块设定出题的品格区间</p>
+              </div>
+            </div>
+            <div class="fret-range-slider" role="group" aria-label="品格范围选择">
+              <div class="range-values" aria-live="polite">
+                <span id="fretRangeMin">0</span>
+                <span>–</span>
+                <span id="fretRangeMax">12</span>
+                <span>品</span>
+              </div>
+              <div class="range-track-wrap">
+                <div class="range-track-bg"></div>
+                <div class="range-track-fill" id="fretRangeFill"></div>
+                <input type="range" id="fretRangeMinInput" min="0" max="24" value="0" step="1" aria-label="起始品格" />
+                <input type="range" id="fretRangeMaxInput" min="0" max="24" value="12" step="1" aria-label="结束品格" />
+              </div>
+              <div class="range-labels">
+                <span>0</span>
+                <span>12</span>
+                <span>24</span>
+              </div>
+            </div>
+          </article>
+        </aside>
+
+        <div class="main-column">
+          <section class="hero" aria-labelledby="current-note-label">
+            <div class="hero-orbs" aria-hidden="true">
+              <span class="orb orb-1"></span>
+              <span class="orb orb-2"></span>
+              <span class="orb orb-3"></span>
+            </div>
+            <div class="eyebrow reveal fade-in stagger-1" id="current-note-label">
+              <span class="pulse-dot"></span>
+              当前音名
+            </div>
+
+            <div class="note-column reveal scale-in stagger-2">
+              <div class="note-stage">
+                <div class="note-card brutal-shadow-lg" aria-live="assertive">
+                  <span id="currentNote">C</span>
                 </div>
               </div>
-              <div class="fret-range-slider" role="group" aria-label="品格范围选择">
-                <div class="range-values" aria-live="polite">
-                  <span id="fretRangeMin">0</span>
-                  <span>–</span>
-                  <span id="fretRangeMax">12</span>
-                  <span>品</span>
-                </div>
-                <div class="range-track-wrap">
-                  <div class="range-track-bg"></div>
-                  <div class="range-track-fill" id="fretRangeFill"></div>
-                  <input type="range" id="fretRangeMinInput" min="0" max="24" value="0" step="1" aria-label="起始品格" />
-                  <input type="range" id="fretRangeMaxInput" min="0" max="24" value="12" step="1" aria-label="结束品格" />
-                </div>
-                <div class="range-labels">
-                  <span>0</span>
-                  <span>12</span>
-                  <span>24</span>
-                </div>
+              <div class="note-actions">
+                <button class="side-action reveal-action brutal-shadow brutal-shadow-hover" id="revealButton" type="button">
+                  <span class="action-icon" aria-hidden="true">◉</span>
+                  <span>显示答案</span>
+                </button>
+                <button class="side-action next-action brutal-shadow brutal-shadow-hover" id="nextButton" type="button">
+                  <span class="action-icon" aria-hidden="true">→</span>
+                  <span>下一个音</span>
+                </button>
               </div>
-            </article>
+              <p class="instruction" id="instruction">在吉他上弹出这个音的任意位置，然后查看答案。</p>
+            </div>
+          </section>
 
-          </aside>
+          <section class="fretboard-section brutal-shadow reveal" aria-labelledby="fretboard-title">
+            <div class="section-heading">
+              <div>
+                <p class="section-kicker" id="sectionKicker">练习区域</p>
+                <h1 id="fretboard-title">六弦吉他指板</h1>
+              </div>
+
+              <div class="mode-tabs" role="tablist" aria-label="练习模式">
+                <button class="mode-tab active" id="browseModeTab" type="button" role="tab" aria-selected="true" data-mode="browse">浏览</button>
+                <button class="mode-tab" id="practiceModeTab" type="button" role="tab" aria-selected="false" data-mode="practice">练习</button>
+              </div>
+
+              <div class="answer-status" id="answerStatus">
+                <span aria-hidden="true">●</span>
+                <span>答案已隐藏</span>
+              </div>
+            </div>
+
+            <div class="practice-stats brutal-shadow" id="practiceStats" hidden>
+              <div class="stat-item"><span>本题进度</span><strong id="statProgress">0 / 0</strong></div>
+              <div class="stat-item"><span>首答正确</span><strong id="statCorrect">0</strong></div>
+              <div class="stat-item"><span>答错题数</span><strong id="statWrong">0</strong></div>
+              <div class="stat-item"><span>正确率</span><strong id="statAccuracy">—</strong></div>
+              <div class="stat-item stat-best"><span>该难度最佳</span><strong id="statBest">—</strong></div>
+            </div>
+
+            <div class="fretboard-scroll" id="fretboardScroll" tabindex="0" aria-label="六弦吉他指板，可横向滚动">
+              <div class="fretboard-wrap">
+                <div class="fret-numbers" id="fretNumbers"></div>
+                <div class="fretboard" id="fretboard"></div>
+              </div>
+            </div>
+            <p class="fretboard-hint"><span class="hint-line"></span> 从上到下为 E、B、G、D、A、E 弦，包含空弦和第 1 至 24 品。</p>
+          </section>
         </div>
-      </section>
-
-      <section class="fretboard-section brutal-shadow reveal" aria-labelledby="fretboard-title">
-        <div class="section-heading">
-          <div>
-            <p class="section-kicker" id="sectionKicker">练习区域</p>
-            <h1 id="fretboard-title">六弦吉他指板</h1>
-          </div>
-
-          <div class="mode-tabs" role="tablist" aria-label="练习模式">
-            <button class="mode-tab active" id="browseModeTab" type="button" role="tab" aria-selected="true" data-mode="browse">浏览</button>
-            <button class="mode-tab" id="practiceModeTab" type="button" role="tab" aria-selected="false" data-mode="practice">练习</button>
-          </div>
-
-          <div class="answer-status" id="answerStatus">
-            <span aria-hidden="true">●</span>
-            <span>答案已隐藏</span>
-          </div>
-        </div>
-
-        <div class="practice-stats brutal-shadow" id="practiceStats" hidden>
-          <div class="stat-item"><span>本题进度</span><strong id="statProgress">0 / 0</strong></div>
-          <div class="stat-item"><span>首答正确</span><strong id="statCorrect">0</strong></div>
-          <div class="stat-item"><span>答错题数</span><strong id="statWrong">0</strong></div>
-          <div class="stat-item"><span>正确率</span><strong id="statAccuracy">—</strong></div>
-          <div class="stat-item stat-best"><span>该难度最佳</span><strong id="statBest">—</strong></div>
-        </div>
-
-        <div class="fretboard-scroll" id="fretboardScroll" tabindex="0" aria-label="六弦吉他指板，可横向滚动">
-          <div class="fretboard-wrap">
-            <div class="fret-numbers" id="fretNumbers"></div>
-            <div class="fretboard" id="fretboard"></div>
-          </div>
-        </div>
-        <p class="fretboard-hint"><span class="hint-line"></span> 从上到下为 E、B、G、D、A、E 弦，包含空弦和第 1 至 24 品。</p>
-      </section>
+      </div>
 
       <footer class="reveal fade-in">
         <span>快捷键</span>

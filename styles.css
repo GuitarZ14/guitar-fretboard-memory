@@ -119,6 +119,30 @@ button { color: inherit; cursor: pointer; }
   padding-bottom: 16px;
 }
 
+/* ===================== 桌面左右分栏布局（方案三） ===================== */
+/* 左：练习设置侧栏（粘性、垂直堆叠）；右：当前音名 + 指板主区 */
+.layout-split {
+  display: grid;
+  grid-template-columns: minmax(248px, 280px) minmax(0, 1fr);
+  gap: 18px;
+  align-items: start;
+}
+
+.sidebar-controls {
+  display: grid;
+  gap: 14px;
+  align-self: start;
+  position: sticky;
+  top: 16px;
+}
+
+.main-column {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  min-width: 0; /* 允许内部指板横向滚动时正确收缩 */
+}
+
 /* ===================== 顶栏 ===================== */
 .topbar {
   display: flex;
@@ -171,6 +195,15 @@ button { color: inherit; cursor: pointer; }
   color: var(--text-3);
 }
 .round-count strong { font-family: var(--font); font-size: 24px; font-weight: 800; color: var(--text); }
+
+/* 桌面大屏：放大标题栏，让顶部视觉更有分量，同时进一步压缩旧空白 */
+@media (min-width: 1041px) {
+  .topbar { min-height: 72px; padding: 12px 22px; margin-bottom: 22px; }
+  .brand-mark { width: 44px; height: 44px; font-size: 26px; border-radius: 14px; }
+  .brand strong { font-size: 17px; }
+  .brand small { font-size: 10px; }
+  .round-count strong { font-size: 32px; }
+}
 
 /* ===================== Hero ===================== */
 .hero {
@@ -246,22 +279,9 @@ button { color: inherit; cursor: pointer; }
   animation: pulse-ring 1.6s ease-out infinite;
 }
 
-/* ===================== 主舞台：左/右控制 + 中央音名 ===================== */
-.main-stage {
-  position: relative;
-  z-index: 1;
-  display: grid;
-  grid-template-columns: minmax(210px, 1fr) minmax(260px, 1.2fr) minmax(210px, 1fr);
-  gap: 16px;
-  align-items: start;
-  text-align: left;
-}
-
-.stage-controls {
-  display: grid;
-  grid-template-rows: repeat(3, minmax(92px, auto));
-  gap: 14px;
-}
+/* ===================== 控制卡片（侧栏内） ===================== */
+/* 注：原 .main-stage / .stage-controls 三栏布局已重构为 .layout-split 左右分栏，
+   本区块仅保留 .control-card 及其子元素的视觉与交互规则。 */
 
 /* ---- 控制卡片：中性黏土 + 悬停上浮 ---- */
 .control-card {
@@ -887,7 +907,9 @@ kbd { padding: 3px 6px; color: var(--text-2); background: var(--surface); border
   .orb-3 { width: 78px; height: 78px; }
   .eyebrow { margin-bottom: 10px; padding: 5px 12px; font-size: 9px; }
 
-  .main-stage { display: flex; flex-direction: column; gap: 10px; align-items: stretch; }
+  .layout-split { display: flex; flex-direction: column; gap: 14px; }
+  .sidebar-controls { order: 2; position: static; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  .main-column { order: 1; }
   .note-column { order: 1; gap: 10px; }
   .note-card { width: 100px; height: 100px; }
   .note-card span { font-size: 56px; }
@@ -895,28 +917,22 @@ kbd { padding: 3px 6px; color: var(--text-2); background: var(--surface); border
   .side-action { width: 46px; height: 46px; min-height: 46px; padding: 0; }
   .side-action span:last-child { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0, 0, 0, 0); }
   .instruction { margin-top: 0; font-size: 10px; max-width: 220px; }
-  .stage-controls {
-    order: 3;
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 8px;
-    grid-template-rows: none;
-  }
-  .stage-controls .control-card { padding: 8px 9px; }
-  .stage-controls .control-title-row { grid-template-columns: 24px 1fr auto; gap: 4px; padding-bottom: 4px; }
-  .stage-controls .control-icon { width: 24px; height: 24px; font-size: 11px; }
-  .stage-controls .control-card h2 { font-size: 10px; }
-  .stage-controls .control-card p { display: none; }
-  .stage-controls .setting-row { display: flex; flex-direction: column; align-items: stretch; gap: 3px; margin-top: 6px; padding-top: 5px; }
-  .stage-controls .speed-fields { gap: 4px; }
-  .stage-controls .number-field { height: 26px; }
-  .stage-controls .number-field button { width: 24px; }
-  .stage-controls .number-field input { width: 28px; }
-  .stage-controls .fret-range-slider { margin-top: 6px; }
-  .stage-controls .range-values { font-size: 14px; margin-bottom: 5px; }
-  .stage-controls .range-track-wrap { height: 22px; }
-  .stage-controls .range-track-wrap input[type="range"]::-webkit-slider-thumb { width: 14px; height: 20px; margin-top: -8px; }
-  .stage-controls .range-track-wrap input[type="range"]::-moz-range-thumb { width: 14px; height: 20px; }
+  .sidebar-controls { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  .sidebar-controls .control-card { padding: 8px 9px; }
+  .sidebar-controls .control-title-row { grid-template-columns: 24px 1fr auto; gap: 4px; padding-bottom: 4px; }
+  .sidebar-controls .control-icon { width: 24px; height: 24px; font-size: 11px; }
+  .sidebar-controls .control-card h2 { font-size: 10px; }
+  .sidebar-controls .control-card p { display: none; }
+  .sidebar-controls .setting-row { display: flex; flex-direction: column; align-items: stretch; gap: 3px; margin-top: 6px; padding-top: 5px; }
+  .sidebar-controls .speed-fields { gap: 4px; }
+  .sidebar-controls .number-field { height: 26px; }
+  .sidebar-controls .number-field button { width: 24px; }
+  .sidebar-controls .number-field input { width: 28px; }
+  .sidebar-controls .fret-range-slider { margin-top: 6px; }
+  .sidebar-controls .range-values { font-size: 14px; margin-bottom: 5px; }
+  .sidebar-controls .range-track-wrap { height: 22px; }
+  .sidebar-controls .range-track-wrap input[type="range"]::-webkit-slider-thumb { width: 14px; height: 20px; margin-top: -8px; }
+  .sidebar-controls .range-track-wrap input[type="range"]::-moz-range-thumb { width: 14px; height: 20px; }
 
   .fretboard-section { margin-inline: -8px; padding: 12px 12px; border-left: 0; border-right: 0; border-radius: 16px; }
   .section-heading { gap: 6px; margin-bottom: 8px; }
@@ -939,11 +955,11 @@ kbd { padding: 3px 6px; color: var(--text-2); background: var(--surface); border
 }
 
 @media (min-width: 761px) and (max-width: 1040px) {
-  .main-stage { grid-template-columns: minmax(210px, 240px) 1fr minmax(210px, 240px); gap: 12px; }
+  .layout-split { grid-template-columns: minmax(220px, 240px) minmax(0, 1fr); gap: 12px; }
   .note-card { width: 104px; height: 104px; }
   .note-card span { font-size: 56px; }
-  .stage-controls { grid-template-rows: repeat(3, minmax(86px, auto)); gap: 10px; }
-  .stage-controls .control-card { padding: 12px 14px; }
+  .sidebar-controls { gap: 10px; }
+  .sidebar-controls .control-card { padding: 12px 14px; }
   .section-heading { margin-bottom: 8px; }
   .fretboard { grid-template-rows: repeat(6, 28px); }
   .fret-numbers { margin-bottom: 5px; }
@@ -961,25 +977,25 @@ kbd { padding: 3px 6px; color: var(--text-2); background: var(--surface); border
   .hero { padding: 2px 0 6px; }
   .hero-orbs { height: 170px; }
   .eyebrow { margin-bottom: 6px; padding: 4px 10px; font-size: 8px; }
-  .main-stage { gap: 6px; }
+  .layout-split { gap: 6px; }
   .note-card { width: 60px; height: 60px; }
   .note-card span { font-size: 36px; }
   .note-actions { margin-top: 4px; gap: 6px; }
   .side-action { width: 34px; height: 34px; min-height: 34px; }
   .instruction { margin-top: 2px; font-size: 8px; max-width: 200px; }
-  .stage-controls { gap: 6px; }
-  .stage-controls .control-card { padding: 5px 7px; }
-  .stage-controls .control-title-row { padding-bottom: 3px; }
-  .stage-controls .control-card h2 { font-size: 9px; }
-  .stage-controls .control-icon { width: 20px; height: 20px; font-size: 10px; }
-  .stage-controls .setting-row { display: flex; flex-direction: column; align-items: stretch; gap: 2px; margin-top: 4px; padding-top: 3px; }
-  .stage-controls .speed-fields { gap: 3px; }
-  .stage-controls .number-field { height: 22px; }
-  .stage-controls .number-field button { width: 20px; }
-  .stage-controls .number-field input { width: 24px; }
-  .stage-controls .fret-range-slider { margin-top: 4px; }
-  .stage-controls .range-values { font-size: 11px; margin-bottom: 2px; }
-  .stage-controls .range-track-wrap { height: 12px; }
+  .sidebar-controls { gap: 6px; }
+  .sidebar-controls .control-card { padding: 5px 7px; }
+  .sidebar-controls .control-title-row { padding-bottom: 3px; }
+  .sidebar-controls .control-card h2 { font-size: 9px; }
+  .sidebar-controls .control-icon { width: 20px; height: 20px; font-size: 10px; }
+  .sidebar-controls .setting-row { display: flex; flex-direction: column; align-items: stretch; gap: 2px; margin-top: 4px; padding-top: 3px; }
+  .sidebar-controls .speed-fields { gap: 3px; }
+  .sidebar-controls .number-field { height: 22px; }
+  .sidebar-controls .number-field button { width: 20px; }
+  .sidebar-controls .number-field input { width: 24px; }
+  .sidebar-controls .fret-range-slider { margin-top: 4px; }
+  .sidebar-controls .range-values { font-size: 11px; margin-bottom: 2px; }
+  .sidebar-controls .range-track-wrap { height: 12px; }
   .fretboard-section { padding: 9px 10px; }
   .section-heading { margin-bottom: 5px; }
   .section-heading h1 { font-size: 14px; }
@@ -996,7 +1012,7 @@ kbd { padding: 3px 6px; color: var(--text-2); background: var(--surface); border
 
 /* 矮视口 — 笔记本/平板：仅压缩侧栏卡片与指板行高 */
 @media (max-height: 780px) and (min-width: 761px) {
-  .main-stage { gap: 10px; }
+  .layout-split { gap: 10px; }
   .note-card { width: 96px; height: 96px; }
   .note-card span { font-size: 54px; }
   .note-column { gap: 10px; }
@@ -1004,8 +1020,8 @@ kbd { padding: 3px 6px; color: var(--text-2); background: var(--surface); border
   .fretboard { grid-template-rows: repeat(6, 24px); }
   .section-heading { margin-bottom: 6px; }
   .practice-stats { margin-bottom: 6px; }
-  .stage-controls { gap: 10px; grid-template-rows: repeat(3, minmax(82px, auto)); }
-  .stage-controls .control-card { padding: 10px 13px; }
+  .sidebar-controls { gap: 10px; }
+  .sidebar-controls .control-card { padding: 10px 13px; }
 }
 
 /* ===================== 降低动效偏好 ===================== */
