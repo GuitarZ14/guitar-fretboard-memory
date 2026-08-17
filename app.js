@@ -628,7 +628,6 @@ function setMode(mode) {
   elements.practiceModeTab.setAttribute("aria-selected", String(mode === "practice"));
   elements.fretboard.classList.toggle("practice", mode === "practice");
   elements.practiceStats.hidden = mode !== "practice";
-  elements.difficultyCard.classList.toggle("disabled", mode === "browse");
   elements.instruction.textContent =
     mode === "practice"
       ? "点击指板上对应位置作答，答完自动进入下一题。"
@@ -689,6 +688,9 @@ function syncControlState() {
   elements.autoNextSetting.classList.toggle("enabled", elements.autoNextToggle.checked);
   elements.autoRevealSetting.classList.toggle("enabled", elements.autoRevealToggle.checked && !practice);
   elements.autoRevealCard.classList.toggle("disabled", practice);
+  // 练习难度卡片：仅练习模式可交互并高亮，浏览模式禁用并灰化
+  elements.difficultyCard.classList.toggle("disabled", !practice);
+  elements.difficultyCard.classList.toggle("highlight", practice);
   state.startedAt = performance.now();
   if (!elements.autoNextToggle.checked) elements.nextProgress.style.width = "0";
   if (!elements.autoRevealToggle.checked) elements.revealProgress.style.width = "0";

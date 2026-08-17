@@ -282,7 +282,23 @@ button { color: inherit; cursor: pointer; }
   box-shadow: var(--shadow-clay-lift);
   border-color: rgba(255, 255, 255, 0.95);
 }
-.control-card.disabled { opacity: 0.5; pointer-events: none; }
+.control-card.disabled {
+  opacity: 0.55 !important;
+  pointer-events: none;
+  filter: grayscale(0.55);
+  cursor: not-allowed;
+  box-shadow: var(--shadow-clay-sm);
+  transition: opacity .7s ease, filter .3s ease, box-shadow .3s ease, border-color .3s ease;
+}
+/* 练习模式下高亮难度卡片，标识其当前可操作 */
+.control-card.highlight {
+  border-color: rgba(178, 162, 222, 0.95);
+  box-shadow: var(--shadow-clay-lilac), 0 0 0 3px rgba(230, 230, 250, 0.7);
+}
+.control-card.highlight:hover {
+  border-color: rgba(178, 162, 222, 0.95);
+  box-shadow: var(--shadow-clay-lilac), 0 0 0 3px rgba(230, 230, 250, 0.7);
+}
 
 .control-title-row {
   display: grid;
