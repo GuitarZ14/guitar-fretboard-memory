@@ -1,0 +1,171 @@
+# 指板名记忆 · CloudBase（腾讯云开发）部署指南
+
+> 适用项目：`指板名记忆/`（六弦吉他指板记忆训练，纯静态站点）
+> 技术栈：原生 HTML / CSS / JS + 本地音频，无后端、无数据库、无密钥
+> 结论先行：**本项目只需要 CloudBase 静态网站托管（Hosting），不需要云函数、数据库或环境变量**
+
+---
+
+## 1. 环境准备
+
+| 项目 | 要求 | 当前状态 |
+| --- | --- | --- |
+| Node.js | ≥ 14（Hosting 部署用 CLI） | ✅ v22.22.2 已满足 |
+| `@cloudbase/cli` | 部署命令行工具 | ⬜ 需安装 |
+| 系统 | macOS / Windows / Linux | macOS |
+
+安装 CLI（全局）：
+
+```bash
+# 推荐使用 npm 全局安装
+npm install -g @cloudbase/cli
+
+# 验证安装成功
+tcb --version
+```
+
+> 若 `tcb` 命令报权限错误，加 `sudo` 或用 `npx @cloudbase/cli` 前缀。
+> 首次使用建议运行 `tcb -h` 查看本机 CLI 版本对应的命令集（命令名随版本略有差异时以 `-h` 为准）。
+
+---
+
+## 2. 项目配置（cloudbaserc.json）
+
+项目根目录已生成 `cloudbaserc.json`：
+
+```json
+{
+  "envId": "your-env-id",
+  "framework": {
+    "name": "guitar-fretboard-memory",
+    "plugins": {
+      "hosting": {
+        "use": "@cloudbase/framework-plugin-hosting",
+        "inputs": {
+          "outputPath": ".",
+          "cloudPath": "/",
+          "ignore": [".workbuddy", "node_modules", "*.log"]
+        }
+      }
+    }
+  }
+}
+```
+
+字段说明：
+- `envId`：准备步骤中通过 `tcb env:list` 查到的环境 ID，**必须替换 `your-env-id`**。
+- `framework.plugins.hosting`：**静态托管插件**，本项目唯一需要的资源。
+  - `outputPath: "."`：站点根目录即项目根（无需构建，直接用 `index.html`）。
+  - `cloudPath: "/"`：上传到托管根路径。
+  - `ignore`：排除本地记忆目录 `.workbuddy`、依赖与日志，避免误传。
+
+### 本项目为什么只有 hosting？
+
+原提示词模板里提到的「云函数 / 数据库 / 环境变量」在**本项目均不适用**：
+- 无后端逻辑 → 不需要 **Cloud Functions**；
+- 无服务端数据 → 不需要 **数据库 / 存储**；
+- 所有数据（练习次数、最佳成绩）存在浏览器 `localStorage` → 无 **API 密钥 / 连接串**，无需云端环境变量、无硬编码风险。
+
+如果未来你给本站点加了后端（例如把成绩同步到云端、或加一个朗读接口的云函数），再按第 4、5 节追加对应声明即可。
+
+---
+
+## 3. 部署流程
+
+### 第 1 步：登录 CloudBase
+
+```bash
+tcb login
+```
+
+浏览器自动打开授权页，扫码登录（或按提示在终端完成）。
+
+### 第 2 步：确认环境并填入 envId
+
+```bash
+tcb env:list
+```
+
+复制输出里的环境 ID，编辑 `cloudbaserc.json` 把 `"envId": "your-env-id"` 替换成真实值。
+
+### 第 3 步：执行部署
+
+**方式 A（推荐，基于 framework 配置，可重复执行）：**
+
+```bash
+tcb framework:deploy
+```
+
+CLI 会自动安装 `@cloudbase/framework-plugin-hosting` 并把根目录上传到托管路径。
+
+**方式 B（经典托管命令，等价写法）：**
+
+```bash
+tcb hosting:deploy ./ -e <你的环境ID>
+```
+
+> 两种写法任选其一；方式 A 复用 `cloudbaserc.json`，更适合团队和 CI。
+
+### 第 4 步：拿到访问域名
+
+部署完成后控制台「静态网站托管」会给出：
+- `https://<envId>.tcloudbaseapp.com/` 默认域名
+- 或在「环境设置 → 域名」绑定的自定义域名
+
+---
+
+## 4. 环境变量与密钥
+
+**本项目无需云端环境变量**（无密钥、无连接串、无硬编码）。
+
+如未来需要（例如接入真实后端），CloudBase 的安全做法是：
+
+- 云函数环境变量：在控制台「云函数 → 配置 → 环境变量」填写，或在 `cloudbaserc.json` 的函数 `envVariables` 中声明，**绝不写入源码**；
+- 前端敏感配置：任何发给浏览器的内容都是可见的，前端**不要**存放 Secret；Secret 一律留在云函数/数据库侧，前端只调用无密钥的接口；
+- `.gitignore`：本项目的 `.workbuddy/` 为本地记忆，无需保密；若以后引入 `.env`，务必加入忽略列表。
+
+---
+
+## 5. 验证与回滚
+
+### 验证
+
+1. **页面可访问**：打开第 3 步拿到的域名，确认首页正常、音名绿圈显示、`显示答案` 能亮起绿色位置。
+2. **练习模式**：切到「练习」标签，点击指板作答，确认计分栏与成绩汇总弹窗正常。
+3. **云函数日志**：本项目无云函数，无需查看；若日后加入后端，用 `tcb fn logs <函数名> -e <envId>` 查看。
+
+### 回滚
+
+静态托管保留版本历史：
+
+1. 控制台 → 环境 → **静态网站托管 → 版本管理**，可查看每次上传的版本；
+2. 选中上一版本「回滚」即可恢复；
+3. CLI 侧可重新执行 `tcb framework:deploy` / `tcb hosting:deploy` 用旧文件重新发布（建议发布前用 git 锁定版本）。
+
+---
+
+## 6. 注意事项
+
+- **配额**：免费版静态托管通常有存储（约 1 GB）与月流量（约 5 GB/月，以控制台为准）上限；本项目约 640 KB，远未触及，可放心托管。
+- **跨域（CORS）**：CSS、JS 同源加载，默认无跨域问题；日后若引入独立域名的外部资源，需在对应服务配置允许本站点域名的 CORS。
+- **CDN 与缓存**：静态托管走 CDN，更新后若看到旧文件，强刷浏览器或等待边缘缓存过期；可在发布时变更资源查询串（当前 `app.js?v=1` 等）来强制刷新。
+- **无冷启动**：静态托管没有云函数冷启动问题，打开即达，体验稳定。
+- **HTTPS**：CloudBase 默认提供 HTTPS，无需自配证书。
+- **权限**：默认域名即公网可访问；如需限制，可在「静态网站托管 → 权限设置」调整。
+
+---
+
+## 附：一键速查命令
+
+```bash
+# 安装 / 登录 / 查看环境
+npm install -g @cloudbase/cli
+tcb login
+tcb env:list
+
+# 部署（确保已把真实 envId 写入 cloudbaserc.json）
+tcb framework:deploy
+
+# 经典写法
+tcb hosting:deploy ./ -e <环境ID>
+```

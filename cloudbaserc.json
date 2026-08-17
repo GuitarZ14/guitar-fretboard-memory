@@ -1,0 +1,16 @@
+{
+  "envId": "your-env-id",
+  "framework": {
+    "name": "guitar-fretboard-memory",
+    "plugins": {
+      "hosting": {
+        "use": "@cloudbase/framework-plugin-hosting",
+        "inputs": {
+          "outputPath": ".",
+          "cloudPath": "/",
+          "ignore": [".workbuddy", "node_modules", "*.log"]
+        }
+      }
+    }
+  }
+}
