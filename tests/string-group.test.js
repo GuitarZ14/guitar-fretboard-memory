@@ -25,6 +25,21 @@ async function stringInRangeNotDimmed(page, idx, maxFret) {
     return cells.length > 0 && cells.every((c) => !c.classList.contains("dimmed"));
   }, { i: idx, max: maxFret });
 }
+async function inRangeCells(page, idx, maxFret) {
+  return page.evaluate(({ i, max }) => {
+    const inRange = [...document.querySelectorAll(`.fret-cell[data-string-index="${i}"]`)]
+      .filter((c) => Number(c.dataset.fret) <= max);
+    const outRange = [...document.querySelectorAll(`.fret-cell[data-string-index="${i}"]`)]
+      .filter((c) => Number(c.dataset.fret) > max);
+    return {
+      inAll: inRange.length > 0 && inRange.every((c) => c.classList.contains("in-range")),
+      outNone: outRange.length > 0 && outRange.every((c) => !c.classList.contains("in-range")),
+    };
+  }, { i: idx, max: maxFret });
+}
+async function inRangeCount(page) {
+  return page.evaluate(() => document.querySelectorAll(".fret-cell.in-range").length);
+}
 
 (async () => {
   const browser = await chromium.launch({ executablePath: EXEC, args: ["--no-sandbox"] });
@@ -74,6 +89,19 @@ async function stringInRangeNotDimmed(page, idx, maxFret) {
   assert(await stringInRangeNotDimmed(page, 1, 12), "一弦 0-12 品范围未 dimmed");
   dim = await dimmedCount(page);
   assert(dim === 137, `选一弦后 dimmed=137（实际 ${dim}）`);
+  const ir = await inRangeCells(page, 1, 12);
+  assert(ir.inAll, "点按模式：选定弦 0-12 品范围内均带 in-range 高亮类");
+  assert(ir.outNone, "点按模式：选定弦 12 品之外的格子不带 in-range 类");
+  const irCount = await inRangeCount(page);
+  assert(irCount === 13, `点按模式选一弦后 in-range 高亮数=13（实际 ${irCount}）`);
+  const irStyle = await page.evaluate(() => {
+    const c = document.querySelector(".fret-cell.in-range");
+    if (!c) return { bg: "none", shadow: "none" };
+    const cs = getComputedStyle(c);
+    return { bg: cs.backgroundImage, shadow: cs.boxShadow };
+  });
+  assert(irStyle.bg.includes("gradient"), "in-range 单元格应用渐变高亮背景填充（非透明）");
+  assert(irStyle.shadow !== "none", "in-range 单元格带描边/外发光阴影（与 dimmed 形成强对比）");
 
   // 6. 多选「二弦」→ 一、二弦 active；dim = 150 - 2*13 = 124
   await page.click('#stringButtons .string-btn[data-string="2"]');

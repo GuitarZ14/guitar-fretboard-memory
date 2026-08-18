@@ -708,6 +708,7 @@ button { color: inherit; cursor: pointer; }
   font: inherit;
   color: inherit;
   cursor: default;
+  transition: background .25s ease, box-shadow .25s ease;
 }
 .fretboard.practice .fret-cell { cursor: pointer; }
 .fret-cell:focus-visible { outline: 3px solid var(--purple-400); outline-offset: -3px; z-index: 5; }
@@ -761,6 +762,24 @@ button { color: inherit; cursor: pointer; }
 
 /* 练习模式：限定品格区间之外的格子淡化 */
 .fret-cell.dimmed { opacity: 0.28; pointer-events: none; }
+
+/* 练习模式：选中的难度区间/弦组范围高亮（与 dimmed 形成强对比）
+   浅蓝→丁香渐变填充 + 蓝色内描边环 + 柔和外发光，清晰标识当前可点按范围 */
+.fret-cell.in-range {
+  background: linear-gradient(145deg, rgba(173, 216, 230, 0.42), rgba(214, 214, 234, 0.34));
+  box-shadow:
+    inset 0 0 0 1.5px rgba(111, 168, 196, 0.6),
+    inset 2px 2px 6px rgba(255, 255, 255, 0.55),
+    0 0 8px rgba(155, 197, 217, 0.45);
+}
+/* 选中范围内、且处于悬停的点按单元格：进一步提亮，强调可交互 */
+.fretboard.practice .fret-cell.in-range:hover {
+  background: linear-gradient(145deg, rgba(173, 216, 230, 0.62), rgba(214, 214, 234, 0.5));
+  box-shadow:
+    inset 0 0 0 2px rgba(111, 168, 196, 0.8),
+    inset 2px 2px 6px rgba(255, 255, 255, 0.6),
+    0 0 12px rgba(155, 197, 217, 0.6);
+}
 
 /* 练习模式：答错闪红 */
 .fret-cell.miss { animation: miss-flash 620ms ease; }

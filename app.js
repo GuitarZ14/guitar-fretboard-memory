@@ -466,7 +466,10 @@ function updateDimmedCells() {
     const stringIndex = Number(cell.dataset.stringIndex);
     const inRange = fret >= min && fret <= max;
     const inStrings = activeStrings.includes(stringIndex);
-    cell.classList.toggle("dimmed", !(inRange && inStrings));
+    const selected = inRange && inStrings;
+    cell.classList.toggle("dimmed", !selected);
+    // 选中的难度区间：标记 in-range，供高亮样式突出显示
+    cell.classList.toggle("in-range", practice && selected);
   });
 }
 
