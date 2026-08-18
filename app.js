@@ -239,6 +239,9 @@ const STRINGS = [
 ];
 // 弦序号 1-6（索引 0 = 一弦高音E … 索引 5 = 六弦低音E）
 const ALL_STRINGS = STRINGS.map((_, index) => index + 1);
+// 进入「点按模式」默认单选一弦：低音 E 弦（6 弦，最基础、0-12 品音位清晰），
+// 确保进入模式即可直接点按，无需用户手动选弦；用户可在模式内切换/多选。
+const DEFAULT_STRING = 6;
 
 // 练习难度现在由用户通过双滑块自由设定品格区间 [minFret, maxFret]
 function loadFretRange() {
@@ -269,20 +272,20 @@ function saveFretRange(range) {
 }
 
 // 练习难度：用户可单独或组合勾选琴弦（1-6）。
-// 默认「全灰、按需选择」——初始不点亮任何弦，由用户主动点击选取。
-// 历史存储若恰好等于「六根全选」，视为旧版默认（非用户显式选择），回落到空（全灰）。
+// 进入点按模式默认「单选一弦」——初始仅点亮默认弦（DEFAULT_STRING），用户可直接点按；
+// 之后可在模式内点弦按钮切换为其他弦或追加多选。
+// 历史存储仅恢复「单弦」选择；多弦/全选视为旧版默认或误操作，回落到默认单选一弦，
+// 以保证每次进入点按模式初始状态都是单选一弦。
 function loadStrings() {
   try {
     const saved = JSON.parse(localStorage.getItem(STRING_STORAGE_KEY));
-    if (Array.isArray(saved) && saved.length > 0 && saved.every((n) => ALL_STRINGS.includes(Number(n)))) {
-      const nums = saved.map(Number).sort((a, b) => a - b);
-      const allSelected = nums.length === ALL_STRINGS.length && ALL_STRINGS.every((n) => nums.includes(n));
-      if (!allSelected) return nums;
+    if (Array.isArray(saved) && saved.length === 1 && ALL_STRINGS.includes(Number(saved[0]))) {
+      return [Number(saved[0])];
     }
   } catch {
     // fall back to default
   }
-  return [];
+  return [DEFAULT_STRING];
 }
 
 function saveStrings(strings) {
@@ -853,6 +856,11 @@ function setMode(mode) {
   if (state.summaryOpen) closeSummary();
 
   if (mode === "practice") {
+    // 进入点按模式：若当前无有效弦选择（用户曾在模式内清空），回退到默认单选一弦，确保进入即可点按
+    if (!Array.isArray(state.practice.strings) || state.practice.strings.length === 0) {
+      state.practice.strings = [DEFAULT_STRING];
+    }
+    renderStringButtons();
     ensurePracticeRound();
   } else {
     clearTimeout(state.practice.advanceTimer);
