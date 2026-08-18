@@ -9,7 +9,7 @@
  * 覆盖：
  *  1. DOM 结构：侧栏(.sidebar-controls) 与 主区(.main-column) 均存在且含预期子元素
  *  2. 桌面布局：侧栏在左、主区在右且顶部对齐；无横向溢出
- *  3. 移动布局：恢复单列，主区在上、控制在下，卡片单列堆叠，模式 tab 并排可见
+ *  3. 移动布局：主区在上、控制在下，侧栏卡片呈 2×2 网格（等高/等宽），模式 tab 并排可见
  *  4. 功能：显示答案 / 下一个音 / 模式切换联动禁用 / 升降号开关 / 难度滑块
  *  5. 视觉：黏土浅色主题无暗色残留、卡片具备双重阴影
  *  6. 健壮性：无 console 报错、无页面异常、无 404
@@ -110,15 +110,25 @@ async function box(page, sel) {
   console.log('\n[移动布局 390×844]');
   const sBox = await box(page, '.sidebar-controls');
   const mBox = await box(page, '.main-column');
-  check('移动端单列：主区在上、侧栏在下', mBox.y < sBox.y - 20, `main.y=${mBox.y.toFixed(0)} sidebar.y=${sBox.y.toFixed(0)}`);
+  check('移动端 2×2：主区在上、侧栏在下', mBox.y < sBox.y - 20, `main.y=${mBox.y.toFixed(0)} sidebar.y=${sBox.y.toFixed(0)}`);
 
-  // 侧栏卡片单列堆叠：四张卡片纵向依次排列（非 2×2 并排）
-  const cardTops = await page.$$eval('.sidebar-controls .control-card', (els) =>
-    els.map((e) => Math.round(e.getBoundingClientRect().y))
+  // 侧栏卡片 2×2 网格：前两张同行、后两张同行、两行依次排列，且四张等高/等宽
+  const cardBoxes = await page.$$eval('.sidebar-controls .control-card', (els) =>
+    els.map((e) => {
+      const r = e.getBoundingClientRect();
+      return { x: r.x, y: r.y, w: r.width, h: r.height, right: r.right, bottom: r.bottom };
+    })
   );
-  check('侧栏卡片呈单列堆叠（首两张不同行）', cardTops.length >= 2 && cardTops[0] < cardTops[1] - 2, 'tops=' + cardTops.join(','));
-  const stackedInOrder = cardTops.length === 4 && cardTops.every((t, i) => i === 0 || t >= cardTops[i - 1] - 1);
-  check('四张控制卡片纵向依次堆叠', stackedInOrder, 'tops=' + cardTops.join(','));
+  const [c0, c1, c2, c3] = cardBoxes;
+  check('侧栏含 4 张卡片（DOM 顺序不变）', cardBoxes.length === 4, 'count=' + cardBoxes.length);
+  check('前两张卡片同行（同一行，y 相同）', Math.abs(c0.y - c1.y) < 2, `y0=${c0.y.toFixed(0)} y1=${c1.y.toFixed(0)}`);
+  check('后两张卡片同行（同一行，y 相同）', Math.abs(c2.y - c3.y) < 2, `y2=${c2.y.toFixed(0)} y3=${c3.y.toFixed(0)}`);
+  check('两行依次排列（第二行在第一行下方）', c2.y > c0.y + 4 && c3.y > c1.y + 4, `row1.y=${c0.y.toFixed(0)} row2.y=${c2.y.toFixed(0)}`);
+  check('同行为两列（左右排布、不重叠）', c1.x > c0.x + c0.w - 2 && Math.abs(c1.y - c0.y) < 2, `x0=${c0.x.toFixed(0)} x1=${c1.x.toFixed(0)}`);
+  const ws = [c0.w, c1.w, c2.w, c3.w].map((n) => n.toFixed(0));
+  check('四张卡片等宽（列宽一致）', Math.abs(c0.w - c1.w) < 1 && Math.abs(c0.w - c2.w) < 1 && Math.abs(c0.w - c3.w) < 1, 'w=' + ws.join(','));
+  const hs = [c0.h, c1.h, c2.h, c3.h].map((n) => n.toFixed(0));
+  check('四张卡片等高（行高一致）', Math.abs(c0.h - c1.h) < 1 && Math.abs(c2.h - c3.h) < 1 && Math.abs(c0.h - c2.h) < 1, 'h=' + hs.join(','));
 
   // 无横向溢出
   const mobOverflow = await page.evaluate(() => ({
@@ -142,6 +152,31 @@ async function box(page, sel) {
   check('移动端两个模式 tab 并排且都可见', tabs.bothVisible && tabs.sideBySide && tabs.bothFit, JSON.stringify(tabs));
 
   await page.screenshot({ path: path.resolve(__dirname, '..', 'tests', 'shot-mobile.png') });
+
+  // 矮视口（≤760 宽且 ≤780 高）：侧栏仍为 2×2 网格，不回退单列
+  await page.setViewportSize({ width: 390, height: 740 });
+  await page.reload({ waitUntil: 'networkidle' });
+  await page.waitForSelector('.layout-split');
+  await page.waitForTimeout(500);
+
+  console.log('\n[矮视口布局 390×740]');
+  const shortBoxes = await page.$$eval('.sidebar-controls .control-card', (els) =>
+    els.map((e) => {
+      const r = e.getBoundingClientRect();
+      return { x: r.x, y: r.y, w: r.width, h: r.height, right: r.right, bottom: r.bottom };
+    })
+  );
+  const [s0, s1, s2, s3] = shortBoxes;
+  check('矮视口仍为 2×2 网格（共 4 张）', shortBoxes.length === 4, 'count=' + shortBoxes.length);
+  check('矮视口前两张同行', Math.abs(s0.y - s1.y) < 2, `y0=${s0.y.toFixed(0)} y1=${s1.y.toFixed(0)}`);
+  check('矮视口后两张同行', Math.abs(s2.y - s3.y) < 2, `y2=${s2.y.toFixed(0)} y3=${s3.y.toFixed(0)}`);
+  check('矮视口两行依次排列', s2.y > s0.y + 4 && s3.y > s1.y + 4, `row1.y=${s0.y.toFixed(0)} row2.y=${s2.y.toFixed(0)}`);
+  check('矮视口同行为两列', s1.x > s0.x + s0.w - 2 && Math.abs(s1.y - s0.y) < 2, `x0=${s0.x.toFixed(0)} x1=${s1.x.toFixed(0)}`);
+  const sw = [s0.w, s1.w, s2.w, s3.w].map((n) => n.toFixed(0));
+  const sh = [s0.h, s1.h, s2.h, s3.h].map((n) => n.toFixed(0));
+  check('矮视口四张卡片等宽', Math.abs(s0.w - s1.w) < 1 && Math.abs(s0.w - s2.w) < 1 && Math.abs(s0.w - s3.w) < 1, 'w=' + sw.join(','));
+  check('矮视口四张卡片等高', Math.abs(s0.h - s1.h) < 1 && Math.abs(s2.h - s3.h) < 1 && Math.abs(s0.h - s2.h) < 1, 'h=' + sh.join(','));
+
 
   // ============ 功能测试（桌面视口） ============
   await page.setViewportSize({ width: 1280, height: 900 });

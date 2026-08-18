@@ -967,17 +967,17 @@ kbd { padding: 3px 6px; color: var(--text-2); background: var(--surface); border
   .side-action span:last-child { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0, 0, 0, 0); }
   .instruction { margin-top: 0; font-size: 11px; max-width: 260px; }
 
-  /* 侧栏控制卡片：改为单列堆叠，避免 2 列高度不一造成的空隙/错位 */
-  .sidebar-controls { order: 2; position: static; display: grid; grid-template-columns: 1fr; gap: 10px; }
-  .sidebar-controls .control-card { padding: 12px 14px; }
+  /* 侧栏控制卡片：2×2 网格，四张卡片等高/等宽、视觉对齐 */
+  .sidebar-controls { order: 2; position: static; display: grid; grid-template-columns: 1fr 1fr; grid-auto-rows: 1fr; gap: 10px; }
+  .sidebar-controls .control-card { padding: 12px 14px; height: 100%; }
   .sidebar-controls .control-title-row { grid-template-columns: 32px 1fr auto; gap: 10px; padding-bottom: 8px; }
   .sidebar-controls .control-icon { width: 32px; height: 32px; font-size: 15px; }
   .sidebar-controls .control-card h2 { font-size: 13px; }
-  .sidebar-controls .control-card p { display: block; font-size: 10px; margin-top: 2px; }
+  /* 压缩：移动端隐藏描述文字以贴近正方形，保留开关/输入可用 */
+  .sidebar-controls .control-card p { display: none; }
   .sidebar-controls .setting-row { display: flex; flex-direction: row; align-items: center; justify-content: space-between; gap: 8px; margin-top: 8px; padding-top: 8px; }
   .sidebar-controls .setting-row > span:first-child,
   .sidebar-controls .setting-row > label { white-space: nowrap; }
-  .sidebar-controls .speed-fields { gap: 6px; flex-wrap: nowrap; }
   .sidebar-controls .number-field { height: 28px; }
   .sidebar-controls .number-field button { width: 26px; }
   .sidebar-controls .number-field input { width: 30px; }
@@ -986,7 +986,18 @@ kbd { padding: 3px 6px; color: var(--text-2); background: var(--surface); border
   .sidebar-controls .range-track-wrap { height: 24px; }
   .sidebar-controls .range-track-wrap input[type="range"]::-webkit-slider-thumb { width: 16px; height: 22px; margin-top: -10px; }
   .sidebar-controls .range-track-wrap input[type="range"]::-moz-range-thumb { width: 16px; height: 22px; }
-  .sidebar-controls .string-buttons { gap: 8px; }
+  /* 自动切换卡片：窄列内将速度输入竖排，避免溢出 */
+  .sidebar-controls #autoNextCard .setting-row { flex-direction: column; align-items: stretch; gap: 6px; }
+  .sidebar-controls #autoNextCard .speed-fields { display: flex; flex-direction: column; align-items: stretch; gap: 6px; }
+  .sidebar-controls #autoNextCard .equals { display: none; }
+  .sidebar-controls #autoNextCard .number-field { width: 100%; justify-content: space-between; }
+  /* 难度卡片：弦组按钮收为单行 6 列、隐藏提示，进一步压低高度贴近正方形 */
+  .sidebar-controls .difficulty-card .string-select-hint { display: none; }
+  .sidebar-controls .difficulty-card .string-select-head { margin-bottom: 5px; }
+  .sidebar-controls .difficulty-card .string-select-block { margin-top: 9px; }
+  .sidebar-controls .difficulty-card .fret-range-slider { margin-top: 6px; }
+  .sidebar-controls .difficulty-card .string-buttons { grid-template-columns: repeat(6, 1fr); gap: 4px; }
+  .sidebar-controls .difficulty-card .string-btn { padding: 5px 0; font-size: 10px; }
 
   .fretboard-section { margin-inline: -8px; padding: 12px 12px; border-left: 0; border-right: 0; border-radius: 16px; }
   /* 标题行：标题 + 答案状态一行；模式切换独占整行，两个 tab 并排且都可见 */
@@ -1038,21 +1049,32 @@ kbd { padding: 3px 6px; color: var(--text-2); background: var(--surface); border
   .note-actions { margin-top: 2px; gap: 6px; }
   .side-action { width: 40px; height: 40px; min-height: 40px; }
   .instruction { margin-top: 2px; font-size: 9px; max-width: 240px; }
-  /* 侧栏保持单列（与 ≤760 一致），仅进一步压缩 */
-  .sidebar-controls { grid-template-columns: 1fr; gap: 6px; }
-  .sidebar-controls .control-card { padding: 7px 10px; }
+  /* 侧栏保持 2×2 网格（与 ≤760 一致），仅进一步压缩内部尺寸 */
+  .sidebar-controls { grid-template-columns: 1fr 1fr; grid-auto-rows: 1fr; gap: 6px; }
+  .sidebar-controls .control-card { padding: 7px 10px; height: 100%; }
   .sidebar-controls .control-title-row { grid-template-columns: 26px 1fr auto; gap: 8px; padding-bottom: 5px; }
   .sidebar-controls .control-icon { width: 26px; height: 26px; font-size: 12px; }
   .sidebar-controls .control-card h2 { font-size: 11px; }
-  .sidebar-controls .control-card p { display: block; font-size: 9px; margin-top: 1px; }
+  .sidebar-controls .control-card p { display: none; }
   .sidebar-controls .setting-row { display: flex; flex-direction: row; align-items: center; justify-content: space-between; gap: 6px; margin-top: 5px; padding-top: 5px; }
-  .sidebar-controls .speed-fields { gap: 4px; flex-wrap: nowrap; }
   .sidebar-controls .number-field { height: 24px; }
   .sidebar-controls .number-field button { width: 22px; }
   .sidebar-controls .number-field input { width: 26px; }
   .sidebar-controls .fret-range-slider { margin-top: 5px; }
   .sidebar-controls .range-values { font-size: 13px; margin-bottom: 3px; }
   .sidebar-controls .range-track-wrap { height: 16px; }
+  /* 自动切换卡片：窄列内竖排速度输入 */
+  .sidebar-controls #autoNextCard .setting-row { flex-direction: column; align-items: stretch; gap: 4px; margin-top: 4px; padding-top: 4px; }
+  .sidebar-controls #autoNextCard .speed-fields { display: flex; flex-direction: column; align-items: stretch; gap: 4px; }
+  .sidebar-controls #autoNextCard .equals { display: none; }
+  .sidebar-controls #autoNextCard .number-field { width: 100%; justify-content: space-between; }
+  /* 难度卡片：进一步压缩 */
+  .sidebar-controls .difficulty-card .string-select-hint { display: none; }
+  .sidebar-controls .difficulty-card .string-select-head { margin-bottom: 3px; }
+  .sidebar-controls .difficulty-card .string-select-block { margin-top: 6px; }
+  .sidebar-controls .difficulty-card .fret-range-slider { margin-top: 4px; }
+  .sidebar-controls .difficulty-card .string-buttons { grid-template-columns: repeat(6, 1fr); gap: 3px; }
+  .sidebar-controls .difficulty-card .string-btn { padding: 3px 0; font-size: 8px; }
   .fretboard-section { padding: 9px 10px; }
   .section-heading { margin-bottom: 6px; gap: 6px; align-items: center; }
   .section-heading > div:first-child { flex: 1 1 auto; min-width: 0; }
