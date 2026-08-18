@@ -675,7 +675,13 @@ button { color: inherit; cursor: pointer; }
 .stat-item strong { font-family: var(--font); font-size: 15px; font-weight: 800; color: var(--text); }
 .stat-item.stat-best strong { color: var(--green); }
 
-.fretboard-scroll { overflow-x: auto; padding: 4px 4px 12px; scrollbar-color: var(--text-3) transparent; scrollbar-width: thin; }
+.fretboard-scroll {
+  overflow-x: auto;
+  padding: 4px 4px 12px;
+  scrollbar-color: var(--text-3) transparent;
+  scrollbar-width: thin;
+  -webkit-overflow-scrolling: touch;
+}
 .fretboard-scroll::-webkit-scrollbar { height: 10px; }
 .fretboard-scroll::-webkit-scrollbar-thumb { background: rgba(120, 120, 140, 0.4); border-radius: var(--radius-pill); }
 .fretboard-scroll:focus-visible { outline: 3px solid var(--purple-400); outline-offset: 3px; }
@@ -710,6 +716,11 @@ button { color: inherit; cursor: pointer; }
   color: inherit;
   cursor: default;
   transition: background .25s ease, box-shadow .25s ease;
+  /* 微信 web-view 触摸优化：禁止双击缩放、移除点击高亮，提升点按响应 */
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-user-select: none;
+  user-select: none;
 }
 .fretboard.practice .fret-cell { cursor: pointer; }
 .fret-cell:focus-visible { outline: 3px solid var(--purple-400); outline-offset: -3px; z-index: 5; }

@@ -100,6 +100,48 @@ function centerInViewport(target, options = {}) {
   };
 }
 
+/**
+ * 统一点击/触摸处理器：兼容桌面 click 与微信 web-view 触摸环境
+ * 微信 web-view 对动态生成的 <button> 点击事件合成不稳定（尤其置于
+ * overflow-x: auto 滚动容器内时），所以额外监听 touchstart/touchend，
+ * 通过位移阈值区分「点击」与「滚动」，并防止 touch + click 重复触发。
+ */
+function addTapListener(element, handler) {
+  let startX = 0;
+  let startY = 0;
+  let moved = false;
+  let lastTouchTime = 0;
+  const TAP_THRESHOLD = 10; // px，超过视为滑动/滚动
+
+  element.addEventListener("touchstart", (e) => {
+    const touch = e.touches[0] || e.changedTouches[0];
+    startX = touch.clientX;
+    startY = touch.clientY;
+    moved = false;
+  }, { passive: true });
+
+  element.addEventListener("touchmove", (e) => {
+    const touch = e.touches[0] || e.changedTouches[0];
+    if (Math.abs(touch.clientX - startX) > TAP_THRESHOLD ||
+        Math.abs(touch.clientY - startY) > TAP_THRESHOLD) {
+      moved = true;
+    }
+  }, { passive: true });
+
+  element.addEventListener("touchend", (e) => {
+    if (moved) return;
+    lastTouchTime = Date.now();
+    e.preventDefault();
+    handler(e);
+  }, { passive: false });
+
+  element.addEventListener("click", (e) => {
+    // 如果 touchend 刚触发过（500ms 内），跳过，避免重复响应
+    if (Date.now() - lastTouchTime < 500) return;
+    handler(e);
+  });
+}
+
 // 六弦标准调弦，从上到下为 1 弦(高音 E) 至 6 弦(低音 E)
 // 标准六弦吉他定弦（从上到下 1~6 弦：高音E、B、G、D、A、低音E）
 // name 直接由 pitch 推导（CHROMATIC[pitch]），保证「空弦音标识」与「实际音高」永不脱节、无法错乱
@@ -319,7 +361,8 @@ function buildFretboard() {
       answer.dataset.pitch = pitchName;
       cell.append(answer);
 
-      cell.addEventListener("click", () => onCellClick(cell));
+      // 用 addTapListener 替代原生 click，兼容微信 web-view 触摸事件
+      addTapListener(cell, () => onCellClick(cell));
       elements.fretboard.append(cell);
     }
   });
