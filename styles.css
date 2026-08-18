@@ -88,6 +88,8 @@ html { scroll-behavior: smooth; }
 body {
   margin: 0;
   min-width: 320px;
+  max-width: 100%;
+  overflow-x: hidden;
   min-height: 100vh;
   color: var(--text-2);
   background: var(--bg);
@@ -918,55 +920,63 @@ kbd { padding: 3px 6px; color: var(--text-2); background: var(--surface); border
 
 /* ===================== 响应式 ===================== */
 @media (max-width: 760px) {
-  .app-shell { width: min(100% - 16px, 1240px); margin-top: 16px; padding-bottom: 14px; }
-  .topbar { min-height: 46px; padding: 6px 12px; margin-bottom: 12px; }
+  .app-shell { width: min(100% - 16px, 1240px); margin-top: 14px; padding-bottom: 14px; }
+  .topbar { min-height: 46px; padding: 6px 12px; margin-bottom: 10px; }
   .brand-mark { width: 30px; height: 30px; font-size: 16px; }
   .brand strong { font-size: 12px; }
   .brand small { font-size: 8px; }
   .round-count strong { font-size: 18px; }
   .round-count span { display: none; }
 
-  .hero { padding: 4px 0 10px; }
-  .hero-orbs { height: 240px; top: -10px; }
-  .orb-1 { width: 84px; height: 84px; }
-  .orb-2 { width: 64px; height: 64px; margin-left: -32px; }
-  .orb-3 { width: 78px; height: 78px; }
-  .eyebrow { margin-bottom: 10px; padding: 5px 12px; font-size: 9px; }
+  /* Hero：压缩纵向间距，与小屏比例协调 */
+  .hero { padding: 2px 0 6px; }
+  .hero-orbs { height: 170px; top: -8px; }
+  .orb-1 { width: 68px; height: 68px; }
+  .orb-2 { width: 52px; height: 52px; margin-left: -26px; }
+  .orb-3 { width: 62px; height: 62px; }
+  .eyebrow { margin-bottom: 8px; padding: 5px 12px; font-size: 9px; }
 
-  .layout-split { display: flex; flex-direction: column; gap: 14px; }
-  .sidebar-controls { order: 2; position: static; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  .layout-split { display: flex; flex-direction: column; gap: 12px; align-items: stretch; }
+  .layout-split > * { min-width: 0; }
   .main-column { order: 1; }
-  .note-column { order: 1; gap: 10px; }
-  .note-card { width: 100px; height: 100px; }
-  .note-card span { font-size: 56px; }
+  .main-column > * { min-width: 0; }
+  .note-column { order: 1; gap: 8px; }
+  .note-card { width: 86px; height: 86px; }
+  .note-card span { font-size: 46px; }
   .note-actions { order: 2; margin-top: 0; gap: 10px; }
-  .side-action { width: 46px; height: 46px; min-height: 46px; padding: 0; }
+  .side-action { width: 48px; height: 48px; min-height: 48px; padding: 0; }
   .side-action span:last-child { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0, 0, 0, 0); }
-  .instruction { margin-top: 0; font-size: 10px; max-width: 220px; }
-  .sidebar-controls { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
-  .sidebar-controls .control-card { padding: 8px 9px; }
-  .sidebar-controls .control-title-row { grid-template-columns: 24px 1fr auto; gap: 4px; padding-bottom: 4px; }
-  .sidebar-controls .control-icon { width: 24px; height: 24px; font-size: 11px; }
-  .sidebar-controls .control-card h2 { font-size: 10px; }
-  .sidebar-controls .control-card p { display: none; }
-  .sidebar-controls .setting-row { display: flex; flex-direction: column; align-items: stretch; gap: 3px; margin-top: 6px; padding-top: 5px; }
-  .sidebar-controls .speed-fields { gap: 4px; }
-  .sidebar-controls .number-field { height: 26px; }
-  .sidebar-controls .number-field button { width: 24px; }
-  .sidebar-controls .number-field input { width: 28px; }
-  .sidebar-controls .fret-range-slider { margin-top: 6px; }
-  .sidebar-controls .range-values { font-size: 14px; margin-bottom: 5px; }
-  .sidebar-controls .range-track-wrap { height: 22px; }
-  .sidebar-controls .range-track-wrap input[type="range"]::-webkit-slider-thumb { width: 14px; height: 20px; margin-top: -8px; }
-  .sidebar-controls .range-track-wrap input[type="range"]::-moz-range-thumb { width: 14px; height: 20px; }
+  .instruction { margin-top: 0; font-size: 11px; max-width: 260px; }
+
+  /* 侧栏控制卡片：改为单列堆叠，避免 2 列高度不一造成的空隙/错位 */
+  .sidebar-controls { order: 2; position: static; display: grid; grid-template-columns: 1fr; gap: 10px; }
+  .sidebar-controls .control-card { padding: 12px 14px; }
+  .sidebar-controls .control-title-row { grid-template-columns: 32px 1fr auto; gap: 10px; padding-bottom: 8px; }
+  .sidebar-controls .control-icon { width: 32px; height: 32px; font-size: 15px; }
+  .sidebar-controls .control-card h2 { font-size: 13px; }
+  .sidebar-controls .control-card p { display: block; font-size: 10px; margin-top: 2px; }
+  .sidebar-controls .setting-row { display: flex; flex-direction: row; align-items: center; justify-content: space-between; gap: 8px; margin-top: 8px; padding-top: 8px; }
+  .sidebar-controls .setting-row > span:first-child,
+  .sidebar-controls .setting-row > label { white-space: nowrap; }
+  .sidebar-controls .speed-fields { gap: 6px; flex-wrap: nowrap; }
+  .sidebar-controls .number-field { height: 28px; }
+  .sidebar-controls .number-field button { width: 26px; }
+  .sidebar-controls .number-field input { width: 30px; }
+  .sidebar-controls .fret-range-slider { margin-top: 8px; }
+  .sidebar-controls .range-values { font-size: 16px; margin-bottom: 6px; }
+  .sidebar-controls .range-track-wrap { height: 24px; }
+  .sidebar-controls .range-track-wrap input[type="range"]::-webkit-slider-thumb { width: 16px; height: 22px; margin-top: -10px; }
+  .sidebar-controls .range-track-wrap input[type="range"]::-moz-range-thumb { width: 16px; height: 22px; }
+  .sidebar-controls .string-buttons { gap: 8px; }
 
   .fretboard-section { margin-inline: -8px; padding: 12px 12px; border-left: 0; border-right: 0; border-radius: 16px; }
-  .section-heading { gap: 6px; margin-bottom: 8px; }
+  /* 标题行：标题 + 答案状态一行；模式切换独占整行，两个 tab 并排且都可见 */
+  .section-heading { gap: 8px; margin-bottom: 10px; align-items: center; }
+  .section-heading > div:first-child { flex: 1 1 auto; min-width: 0; }
   .section-heading h1 { font-size: 16px; }
-  .section-heading > div:first-child { flex: 1 1 auto; }
-  .answer-status { margin-left: auto; font-size: 8px; }
-  .mode-tabs { order: 3; width: 100%; }
-  .mode-tab { flex: 1; padding: 6px 8px; font-size: 9px; }
+  .answer-status { order: 2; margin-left: auto; font-size: 9px; white-space: nowrap; }
+  .mode-tabs { order: 3; width: 100%; margin-top: 2px; }
+  .mode-tab { flex: 1 1 0; min-width: 0; padding: 9px 10px; font-size: 11px; white-space: nowrap; }
   .fretboard { grid-template-rows: repeat(6, 26px); }
   .fret-numbers { font-size: 8px; margin-bottom: 3px; }
   .answer-note { width: 18px; height: 18px; font-size: 9px; }
@@ -1000,31 +1010,37 @@ kbd { padding: 3px 6px; color: var(--text-2); background: var(--surface); border
   .brand strong { font-size: 11px; }
   .brand small { font-size: 7px; }
   .round-count strong { font-size: 16px; }
-  .hero { padding: 2px 0 6px; }
-  .hero-orbs { height: 170px; }
+  .hero { padding: 2px 0 4px; }
+  .hero-orbs { height: 150px; }
   .eyebrow { margin-bottom: 6px; padding: 4px 10px; font-size: 8px; }
-  .layout-split { gap: 6px; }
-  .note-card { width: 60px; height: 60px; }
-  .note-card span { font-size: 36px; }
-  .note-actions { margin-top: 4px; gap: 6px; }
-  .side-action { width: 34px; height: 34px; min-height: 34px; }
-  .instruction { margin-top: 2px; font-size: 8px; max-width: 200px; }
-  .sidebar-controls { gap: 6px; }
-  .sidebar-controls .control-card { padding: 5px 7px; }
-  .sidebar-controls .control-title-row { padding-bottom: 3px; }
-  .sidebar-controls .control-card h2 { font-size: 9px; }
-  .sidebar-controls .control-icon { width: 20px; height: 20px; font-size: 10px; }
-  .sidebar-controls .setting-row { display: flex; flex-direction: column; align-items: stretch; gap: 2px; margin-top: 4px; padding-top: 3px; }
-  .sidebar-controls .speed-fields { gap: 3px; }
-  .sidebar-controls .number-field { height: 22px; }
-  .sidebar-controls .number-field button { width: 20px; }
-  .sidebar-controls .number-field input { width: 24px; }
-  .sidebar-controls .fret-range-slider { margin-top: 4px; }
-  .sidebar-controls .range-values { font-size: 11px; margin-bottom: 2px; }
-  .sidebar-controls .range-track-wrap { height: 12px; }
+  .layout-split { gap: 8px; }
+  .note-card { width: 64px; height: 64px; }
+  .note-card span { font-size: 38px; }
+  .note-actions { margin-top: 2px; gap: 6px; }
+  .side-action { width: 40px; height: 40px; min-height: 40px; }
+  .instruction { margin-top: 2px; font-size: 9px; max-width: 240px; }
+  /* 侧栏保持单列（与 ≤760 一致），仅进一步压缩 */
+  .sidebar-controls { grid-template-columns: 1fr; gap: 6px; }
+  .sidebar-controls .control-card { padding: 7px 10px; }
+  .sidebar-controls .control-title-row { grid-template-columns: 26px 1fr auto; gap: 8px; padding-bottom: 5px; }
+  .sidebar-controls .control-icon { width: 26px; height: 26px; font-size: 12px; }
+  .sidebar-controls .control-card h2 { font-size: 11px; }
+  .sidebar-controls .control-card p { display: block; font-size: 9px; margin-top: 1px; }
+  .sidebar-controls .setting-row { display: flex; flex-direction: row; align-items: center; justify-content: space-between; gap: 6px; margin-top: 5px; padding-top: 5px; }
+  .sidebar-controls .speed-fields { gap: 4px; flex-wrap: nowrap; }
+  .sidebar-controls .number-field { height: 24px; }
+  .sidebar-controls .number-field button { width: 22px; }
+  .sidebar-controls .number-field input { width: 26px; }
+  .sidebar-controls .fret-range-slider { margin-top: 5px; }
+  .sidebar-controls .range-values { font-size: 13px; margin-bottom: 3px; }
+  .sidebar-controls .range-track-wrap { height: 16px; }
   .fretboard-section { padding: 9px 10px; }
-  .section-heading { margin-bottom: 5px; }
+  .section-heading { margin-bottom: 6px; gap: 6px; align-items: center; }
+  .section-heading > div:first-child { flex: 1 1 auto; min-width: 0; }
   .section-heading h1 { font-size: 14px; }
+  .answer-status { order: 2; margin-left: auto; font-size: 8px; white-space: nowrap; }
+  .mode-tabs { order: 3; width: 100%; }
+  .mode-tab { flex: 1 1 0; min-width: 0; padding: 7px 8px; font-size: 10px; white-space: nowrap; }
   .fretboard { grid-template-rows: repeat(6, 20px); }
   .fret-numbers { margin-bottom: 2px; font-size: 7px; }
   .fret-inlay { width: 7px; height: 7px; }

@@ -9,7 +9,7 @@
  * 覆盖：
  *  1. DOM 结构：侧栏(.sidebar-controls) 与 主区(.main-column) 均存在且含预期子元素
  *  2. 桌面布局：侧栏在左、主区在右且顶部对齐；无横向溢出
- *  3. 移动布局：恢复单列，主区在上、控制在下，卡片 2×2 排列
+ *  3. 移动布局：恢复单列，主区在上、控制在下，卡片单列堆叠，模式 tab 并排可见
  *  4. 功能：显示答案 / 下一个音 / 模式切换联动禁用 / 升降号开关 / 难度滑块
  *  5. 视觉：黏土浅色主题无暗色残留、卡片具备双重阴影
  *  6. 健壮性：无 console 报错、无页面异常、无 404
@@ -112,11 +112,34 @@ async function box(page, sel) {
   const mBox = await box(page, '.main-column');
   check('移动端单列：主区在上、侧栏在下', mBox.y < sBox.y - 20, `main.y=${mBox.y.toFixed(0)} sidebar.y=${sBox.y.toFixed(0)}`);
 
-  // 侧栏卡片 2×2：第 1、2 张卡片同 y
+  // 侧栏卡片单列堆叠：四张卡片纵向依次排列（非 2×2 并排）
   const cardTops = await page.$$eval('.sidebar-controls .control-card', (els) =>
     els.map((e) => Math.round(e.getBoundingClientRect().y))
   );
-  check('侧栏卡片呈 2 列（首两张同行）', cardTops.length >= 2 && cardTops[0] === cardTops[1], 'tops=' + cardTops.join(','));
+  check('侧栏卡片呈单列堆叠（首两张不同行）', cardTops.length >= 2 && cardTops[0] < cardTops[1] - 2, 'tops=' + cardTops.join(','));
+  const stackedInOrder = cardTops.length === 4 && cardTops.every((t, i) => i === 0 || t >= cardTops[i - 1] - 1);
+  check('四张控制卡片纵向依次堆叠', stackedInOrder, 'tops=' + cardTops.join(','));
+
+  // 无横向溢出
+  const mobOverflow = await page.evaluate(() => ({
+    scrollW: document.documentElement.scrollWidth,
+    clientW: document.documentElement.clientWidth,
+  }));
+  check('移动端无横向溢出', mobOverflow.scrollW <= mobOverflow.clientW + 2, `scrollW=${mobOverflow.scrollW} clientW=${mobOverflow.clientW}`);
+
+  // 模式切换 tab：两个都可见且并排（核对 + 点按）
+  const tabs = await page.evaluate(() => {
+    const bt = document.querySelector('#browseModeTab');
+    const pt = document.querySelector('#practiceModeTab');
+    const rb = bt.getBoundingClientRect();
+    const rp = pt.getBoundingClientRect();
+    return {
+      bothVisible: rb.width > 0 && rp.width > 0,
+      sideBySide: Math.abs(rb.y - rp.y) < 2,
+      bothFit: rp.right <= window.innerWidth + 1 && rb.left >= -1,
+    };
+  });
+  check('移动端两个模式 tab 并排且都可见', tabs.bothVisible && tabs.sideBySide && tabs.bothFit, JSON.stringify(tabs));
 
   await page.screenshot({ path: path.resolve(__dirname, '..', 'tests', 'shot-mobile.png') });
 
