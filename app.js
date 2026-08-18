@@ -143,46 +143,87 @@ function addTapListener(element, handler) {
 }
 
 /**
- * 委托式点击/触摸处理器：在容器上统一监听，兼容微信 web-view 对动态生成按钮的点击合成问题
- * 比逐元素绑定更可靠，尤其适用于 overflow 滚动容器内的批量格子。
+ * 委托式点击/触摸处理器：在容器上统一监听，兼容微信 web-view 对动态生成按钮的点击合成问题。
+ * 优先使用 Pointer Events（微信 web-view 现代内核/Chromium 均支持），缺失时回退 Touch Events，
+ * click 作为最终兜底并做去抖，避免 pointer 与 click 双触发。比逐元素绑定更可靠。
  */
 function addDelegatedTapListener(container, selector, handler) {
   let startX = 0;
   let startY = 0;
   let moved = false;
-  let lastTouchTime = 0;
-  const TAP_THRESHOLD = 10;
+  let pressing = false;
+  let lastHandleTime = 0;
+  const TAP_THRESHOLD = 10; // px，超过视为滑动/滚动
+  const DEBOUNCE_MS = 300;  // 同一手势触发多次事件源时的去重窗口
 
-  container.addEventListener("touchstart", (e) => {
-    const touch = e.touches[0] || e.changedTouches[0];
-    startX = touch.clientX;
-    startY = touch.clientY;
-    moved = false;
-  }, { passive: true });
+  function resolveTarget(e) {
+    const node = e.target;
+    return node && typeof node.closest === "function" ? node.closest(selector) : null;
+  }
 
-  container.addEventListener("touchmove", (e) => {
-    const touch = e.touches[0] || e.changedTouches[0];
-    if (Math.abs(touch.clientX - startX) > TAP_THRESHOLD ||
-        Math.abs(touch.clientY - startY) > TAP_THRESHOLD) {
+  function deliver(e) {
+    const target = resolveTarget(e);
+    if (!target) return;
+    const now = Date.now();
+    if (now - lastHandleTime < DEBOUNCE_MS) return;
+    lastHandleTime = now;
+    handler(target, e);
+  }
+
+  if (typeof window !== "undefined" && window.PointerEvent) {
+    container.addEventListener("pointerdown", (e) => {
+      // 忽略鼠标左键以外的指针，避免右键/触控笔干扰
+      if (e.pointerType === "mouse" && e.button !== 0) return;
+      startX = e.clientX;
+      startY = e.clientY;
+      moved = false;
+      pressing = true;
+    }, { passive: true });
+
+    container.addEventListener("pointermove", (e) => {
+      if (!pressing) return;
+      if (Math.abs(e.clientX - startX) > TAP_THRESHOLD ||
+          Math.abs(e.clientY - startY) > TAP_THRESHOLD) {
+        moved = true;
+      }
+    }, { passive: true });
+
+    container.addEventListener("pointerup", (e) => {
+      if (!pressing) return;
+      pressing = false;
+      if (moved) return;
+      deliver(e);
+    }, { passive: false });
+
+    container.addEventListener("pointercancel", () => {
+      pressing = false;
       moved = true;
-    }
-  }, { passive: true });
+    }, { passive: true });
+  } else {
+    container.addEventListener("touchstart", (e) => {
+      const touch = e.touches[0] || e.changedTouches[0];
+      startX = touch.clientX;
+      startY = touch.clientY;
+      moved = false;
+    }, { passive: true });
 
-  container.addEventListener("touchend", (e) => {
-    if (moved) return;
-    const target = e.target.closest(selector);
-    if (!target) return;
-    lastTouchTime = Date.now();
-    e.preventDefault();
-    handler(target, e);
-  }, { passive: false });
+    container.addEventListener("touchmove", (e) => {
+      const touch = e.touches[0] || e.changedTouches[0];
+      if (Math.abs(touch.clientX - startX) > TAP_THRESHOLD ||
+          Math.abs(touch.clientY - startY) > TAP_THRESHOLD) {
+        moved = true;
+      }
+    }, { passive: true });
 
-  container.addEventListener("click", (e) => {
-    if (Date.now() - lastTouchTime < 500) return;
-    const target = e.target.closest(selector);
-    if (!target) return;
-    handler(target, e);
-  });
+    container.addEventListener("touchend", (e) => {
+      if (moved) return;
+      e.preventDefault();
+      deliver(e);
+    }, { passive: false });
+  }
+
+  // click 兜底：pointer/touch 已处理过的（去抖窗口内）自动跳过
+  container.addEventListener("click", deliver);
 }
 
 // 六弦标准调弦，从上到下为 1 弦(高音 E) 至 6 弦(低音 E)
@@ -312,6 +353,7 @@ const state = {
     phase: "pending", // pending | done
     firstClick: true,
     advanceTimer: null,
+    lastAdvanceAt: 0, // drawNextNote 防重入去抖时间戳
   },
 };
 
@@ -461,16 +503,34 @@ function syncSpeed(changed) {
   state.startedAt = performance.now();
 }
 
+/**
+ * 确保 state.note 始终是有效音名对象；无效时从队列或题库兜底取一个，
+ * 避免 undefined 冒泡导致渲染/事件回调抛异常、rAF 动画链断裂（表现为界面卡死）。
+ */
+function ensureValidNote() {
+  if (state.note && typeof state.note.pitch === "string" && typeof state.note.display === "string") {
+    return state.note;
+  }
+  if (Array.isArray(state.noteQueue) && state.noteQueue.length > 0) {
+    state.note = state.noteQueue.shift();
+  } else {
+    const pool = state.mode === "practice" ? getPracticeNotes() : getActiveNotes();
+    state.note = createShuffledGroup(state.note, pool.length > 0 ? pool : NOTES)[0] || NOTES[0];
+  }
+  return state.note;
+}
+
 function updateMatches() {
+  const note = ensureValidNote();
   document.querySelectorAll(".answer-note").forEach((marker) => {
-    const matches = marker.dataset.pitch === state.note.pitch;
+    const matches = marker.dataset.pitch === note.pitch;
     marker.classList.toggle("match", matches);
-    marker.textContent = matches ? state.note.display : "";
+    marker.textContent = matches ? note.display : "";
   });
 }
 
 function renderCurrentNote() {
-  const display = state.note.display;
+  const display = ensureValidNote().display;
   if (display.length > 1) {
     const base = display[0];
     const accidental = display.slice(1);
@@ -573,7 +633,7 @@ function startQuestion() {
   state.practice.wrongInQuestion = 0;
   clearCellFeedback();
   setAnswerVisible(false);
-  setAnswerStatus(`在指板上找出 ${state.note.display} 的位置`);
+  setAnswerStatus(`在指板上找出 ${ensureValidNote().display} 的位置`);
   updateStats();
 }
 
@@ -587,9 +647,7 @@ function countSkip() {
 }
 
 function onCellClick(cell) {
-  // eslint-disable-next-line no-console
-  console.log("[fretboard tap] string", cell.dataset.stringIndex, "fret", cell.dataset.fret, "pitch", cell.dataset.pitch, "mode", state.mode, "phase", state.practice.phase, "summary", state.summaryOpen);
-
+  if (!cell || !cell.dataset) return;
   if (state.mode !== "practice" || state.practice.phase !== "pending" || state.summaryOpen) {
     // 如果当前不在可答题状态，给用户一点反馈，便于排查
     if (state.mode === "practice" && state.practice.phase === "done" && !state.summaryOpen) {
@@ -598,7 +656,9 @@ function onCellClick(cell) {
     return;
   }
 
-  if (cell.dataset.pitch === state.note.pitch) {
+  const note = ensureValidNote();
+
+  if (cell.dataset.pitch === note.pitch) {
     cell.blur();
     state.practice.completed += 1;
     state.practice.phase = "done";
@@ -606,7 +666,7 @@ function onCellClick(cell) {
     const suffix = state.practice.wrongInQuestion > 0
       ? `（本题先错过 ${state.practice.wrongInQuestion} 次）`
       : "";
-    setAnswerVisible(true, `答对了！已显示 ${state.note.display} 的位置${suffix}`);
+    setAnswerVisible(true, `答对了！已显示 ${note.display} 的位置${suffix}`);
     cell.classList.add("hit");
     updateStats();
     clearTimeout(state.practice.advanceTimer);
@@ -628,7 +688,7 @@ function handleReveal() {
   if (state.mode === "practice") {
     if (state.practice.phase === "pending" && !state.summaryOpen) {
       countSkip();
-      setAnswerVisible(true, `已显示 ${state.note.display} 的位置（本题跳过）`);
+      setAnswerVisible(true, `已显示 ${ensureValidNote().display} 的位置（本题跳过）`);
       clearTimeout(state.practice.advanceTimer);
       state.practice.advanceTimer = setTimeout(() => newRound(), 1600);
     }
@@ -811,6 +871,14 @@ function drawNextNote({ skipPending = true } = {}) {
 
   if (state.summaryOpen) return;
 
+  // 防重入去抖：跳过/推进动作在 150ms 内被重复触发（如答题自动跳题定时器与
+  // 用户点击「下一题」同时排队）时丢弃多余一次，避免连续跳题与状态冲突
+  if (skipPending && state.mode === "practice") {
+    const now = Date.now();
+    if (now - state.practice.lastAdvanceAt < 150) return;
+    state.practice.lastAdvanceAt = now;
+  }
+
   // 练习模式下，如果本轮未初始化或题目池为空，先尝试重新初始化
   if (state.mode === "practice" && (!state.practice.started || state.practice.roundTotal === 0)) {
     startPracticeRound();
@@ -833,6 +901,7 @@ function drawNextNote({ skipPending = true } = {}) {
   }
 
   state.note = state.noteQueue.shift();
+  ensureValidNote();
   state.round += 1;
   saveRoundCount(state.round);
   state.startedAt = performance.now();
@@ -894,26 +963,31 @@ function toggleString(num) {
 }
 
 function timerLoop(now) {
-  const elapsed = now - state.startedAt;
-  const practice = state.mode === "practice";
+  // 单帧异常不应打断 rAF 动画链（否则表现为界面卡死），所以整帧逻辑用 try 包裹
+  try {
+    const elapsed = now - state.startedAt;
+    const practice = state.mode === "practice";
 
-  // 自动显示答案：练习模式作答时禁用，避免提前泄露
-  if (!practice && elements.autoRevealToggle.checked && !state.answerVisible) {
-    const revealDuration = clampNumber(elements.autoRevealSeconds) * 1000;
-    const revealRatio = Math.min(1, elapsed / revealDuration);
-    elements.revealProgress.style.width = `${revealRatio * 100}%`;
-    if (revealRatio >= 1) setAnswerVisible(true);
-  } else {
-    elements.revealProgress.style.width = "0";
-  }
+    // 自动显示答案：练习模式作答时禁用，避免提前泄露
+    if (!practice && elements.autoRevealToggle.checked && !state.answerVisible) {
+      const revealDuration = clampNumber(elements.autoRevealSeconds) * 1000;
+      const revealRatio = Math.min(1, elapsed / revealDuration);
+      elements.revealProgress.style.width = `${revealRatio * 100}%`;
+      if (revealRatio >= 1) setAnswerVisible(true);
+    } else {
+      elements.revealProgress.style.width = "0";
+    }
 
-  if (elements.autoNextToggle.checked && !state.summaryOpen) {
-    const nextDuration = clampNumber(elements.autoNextSeconds) * 1000;
-    const nextRatio = Math.min(1, elapsed / nextDuration);
-    elements.nextProgress.style.width = `${nextRatio * 100}%`;
-    if (nextRatio >= 1) newRound();
-  } else {
-    elements.nextProgress.style.width = "0";
+    if (elements.autoNextToggle.checked && !state.summaryOpen) {
+      const nextDuration = clampNumber(elements.autoNextSeconds) * 1000;
+      const nextRatio = Math.min(1, elapsed / nextDuration);
+      elements.nextProgress.style.width = `${nextRatio * 100}%`;
+      if (nextRatio >= 1) newRound();
+    } else {
+      elements.nextProgress.style.width = "0";
+    }
+  } catch (err) {
+    // 静默吞掉单帧异常，动画循环继续
   }
 
   state.animationFrame = requestAnimationFrame(timerLoop);
