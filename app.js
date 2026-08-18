@@ -142,6 +142,49 @@ function addTapListener(element, handler) {
   });
 }
 
+/**
+ * 委托式点击/触摸处理器：在容器上统一监听，兼容微信 web-view 对动态生成按钮的点击合成问题
+ * 比逐元素绑定更可靠，尤其适用于 overflow 滚动容器内的批量格子。
+ */
+function addDelegatedTapListener(container, selector, handler) {
+  let startX = 0;
+  let startY = 0;
+  let moved = false;
+  let lastTouchTime = 0;
+  const TAP_THRESHOLD = 10;
+
+  container.addEventListener("touchstart", (e) => {
+    const touch = e.touches[0] || e.changedTouches[0];
+    startX = touch.clientX;
+    startY = touch.clientY;
+    moved = false;
+  }, { passive: true });
+
+  container.addEventListener("touchmove", (e) => {
+    const touch = e.touches[0] || e.changedTouches[0];
+    if (Math.abs(touch.clientX - startX) > TAP_THRESHOLD ||
+        Math.abs(touch.clientY - startY) > TAP_THRESHOLD) {
+      moved = true;
+    }
+  }, { passive: true });
+
+  container.addEventListener("touchend", (e) => {
+    if (moved) return;
+    const target = e.target.closest(selector);
+    if (!target) return;
+    lastTouchTime = Date.now();
+    e.preventDefault();
+    handler(target, e);
+  }, { passive: false });
+
+  container.addEventListener("click", (e) => {
+    if (Date.now() - lastTouchTime < 500) return;
+    const target = e.target.closest(selector);
+    if (!target) return;
+    handler(target, e);
+  });
+}
+
 // 六弦标准调弦，从上到下为 1 弦(高音 E) 至 6 弦(低音 E)
 // 标准六弦吉他定弦（从上到下 1~6 弦：高音E、B、G、D、A、低音E）
 // name 直接由 pitch 推导（CHROMATIC[pitch]），保证「空弦音标识」与「实际音高」永不脱节、无法错乱
@@ -217,7 +260,7 @@ function createShuffledGroup(previousNote = null, notePool = NOTES) {
     [group[index], group[randomIndex]] = [group[randomIndex], group[index]];
   }
 
-  if (group[0]?.key === previousNote?.key) {
+  if (group.length > 1 && group[0]?.key === previousNote?.key) {
     const swapIndex = 1 + Math.floor(Math.random() * (group.length - 1));
     [group[0], group[swapIndex]] = [group[swapIndex], group[0]];
   }
@@ -361,11 +404,12 @@ function buildFretboard() {
       answer.dataset.pitch = pitchName;
       cell.append(answer);
 
-      // 用 addTapListener 替代原生 click，兼容微信 web-view 触摸事件
-      addTapListener(cell, () => onCellClick(cell));
       elements.fretboard.append(cell);
     }
   });
+
+  // 用委托式 tap 监听替代逐元素绑定，兼容微信 web-view 对滚动容器内动态按钮的点击合成问题
+  addDelegatedTapListener(elements.fretboard, ".fret-cell", onCellClick);
 
   // 品记：按真实吉他位置绘制在指板格子内（单点 3/5/7/9/15/17/19/21，双点 12/24）
   const singleInlays = [3, 5, 7, 9, 15, 17, 19, 21];
@@ -543,7 +587,16 @@ function countSkip() {
 }
 
 function onCellClick(cell) {
-  if (state.mode !== "practice" || state.practice.phase !== "pending" || state.summaryOpen) return;
+  // eslint-disable-next-line no-console
+  console.log("[fretboard tap] string", cell.dataset.stringIndex, "fret", cell.dataset.fret, "pitch", cell.dataset.pitch, "mode", state.mode, "phase", state.practice.phase, "summary", state.summaryOpen);
+
+  if (state.mode !== "practice" || state.practice.phase !== "pending" || state.summaryOpen) {
+    // 如果当前不在可答题状态，给用户一点反馈，便于排查
+    if (state.mode === "practice" && state.practice.phase === "done" && !state.summaryOpen) {
+      setAnswerStatus("本题已作答，请点击「下一题」继续");
+    }
+    return;
+  }
 
   if (cell.dataset.pitch === state.note.pitch) {
     cell.blur();
@@ -590,6 +643,13 @@ function formatTime(seconds) {
 }
 
 function finishPracticeRound() {
+  // 没有有效题目时不应弹 summary，而是重新初始化
+  if (state.practice.roundTotal === 0) {
+    closeSummary();
+    startPracticeRound();
+    return;
+  }
+
   state.summaryOpen = true;
   clearTimeout(state.practice.advanceTimer);
   state.practice.advanceTimer = null;
@@ -615,7 +675,7 @@ function finishPracticeRound() {
   elements.summaryTime.textContent = formatTime(elapsed);
   elements.summaryAvg.textContent = `${(elapsed / Math.max(1, completed)).toFixed(1)}s`;
   elements.summaryBest.textContent = `${best}%`;
-  elements.summarySub.textContent = `${rangeLabel} · 共 ${roundTotal} 题已完成`;
+  elements.summarySub.textContent = `${rangeLabel} · 已完成 ${completed} / ${roundTotal} 题`;
 
   elements.summaryOverlay.hidden = false;
 }
@@ -626,18 +686,19 @@ function closeSummary() {
 }
 
 function startPracticeRound() {
-  state.practice.started = true;
   state.practice.accidentals = elements.accidentalsToggle.checked;
   const notes = getPracticeNotes();
   // 弦组为空（默认全灰、用户尚未勾选）：提示先选择弦组，不进入出题，避免空集直接结算
   if (notes.length === 0) {
     setAnswerStatus("请在「选择弦组」中至少勾选一根弦，再开始练习。");
+    state.practice.started = false;
     state.practice.roundTotal = 0;
     state.noteQueue = [];
     updateDimmedCells(); // 同步将指板全部灰化，呈现「默认全灰」状态
     updateStats();
     return;
   }
+  state.practice.started = true;
   state.practice.roundTotal = notes.length;
   state.practice.phase = "pending";
   state.practice.completed = 0;
@@ -750,14 +811,25 @@ function drawNextNote({ skipPending = true } = {}) {
 
   if (state.summaryOpen) return;
 
-  if (skipPending && state.mode === "practice") countSkip();
+  // 练习模式下，如果本轮未初始化或题目池为空，先尝试重新初始化
+  if (state.mode === "practice" && (!state.practice.started || state.practice.roundTotal === 0)) {
+    startPracticeRound();
+    return;
+  }
 
-  if (state.noteQueue.length === 0) {
-    if (state.mode === "practice") {
+  // 跳过当前未答题（计错）
+  if (skipPending && state.mode === "practice" && state.practice.phase === "pending") {
+    countSkip();
+  }
+
+  // 题目队列耗尽：本轮自然结束；若 roundTotal 异常为 0，则重新初始化而不是直接结算
+  if (state.mode === "practice" && state.noteQueue.length === 0) {
+    if (state.practice.roundTotal > 0) {
       finishPracticeRound();
-      return;
+    } else {
+      startPracticeRound();
     }
-    state.noteQueue = createShuffledGroup(state.note, getActiveNotes());
+    return;
   }
 
   state.note = state.noteQueue.shift();

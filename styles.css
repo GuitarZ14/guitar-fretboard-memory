@@ -723,6 +723,11 @@ button { color: inherit; cursor: pointer; }
   user-select: none;
 }
 .fretboard.practice .fret-cell { cursor: pointer; }
+/* 微信 web-view 中确保可点按格子的 pointer-events 不被父级滚动容器覆盖 */
+.fretboard.practice .fret-cell.in-range {
+  pointer-events: auto;
+  touch-action: manipulation;
+}
 .fret-cell:focus-visible { outline: 3px solid var(--purple-400); outline-offset: -3px; z-index: 5; }
 .fret-cell.open { background: rgba(152, 255, 152, 0.18); }
 .fret-cell::after {
