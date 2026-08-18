@@ -13,6 +13,7 @@
  *  4. 功能：显示答案 / 下一个音 / 模式切换联动禁用 / 升降号开关 / 难度滑块
  *  5. 视觉：黏土浅色主题无暗色残留、卡片具备双重阴影
  *  6. 健壮性：无 console 报错、无页面异常、无 404
+ *  7. 移动端指板滚动回归：0–24 品全部存在、可横向滚动、第 24 品滚动后完全进入视口
  */
 
 const path = require('path');
@@ -152,6 +153,58 @@ async function box(page, sel) {
   check('移动端两个模式 tab 并排且都可见', tabs.bothVisible && tabs.sideBySide && tabs.bothFit, JSON.stringify(tabs));
 
   await page.screenshot({ path: path.resolve(__dirname, '..', 'tests', 'shot-mobile.png') });
+
+  // ============ 移动端指板滚动回归（修复 15 品之后品格被截断） ============
+  // 根因：旧版 .fretboard 被容器压到 ~358px，overflow:hidden 裁掉 15 品之后的格子；
+  // 修复后 .fret-numbers / .fretboard 加 min-width: max-content，由 .fretboard-scroll 横向滚动。
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.reload({ waitUntil: 'networkidle' });
+  await page.waitForSelector('#fretboard');
+  await page.waitForTimeout(500);
+
+  console.log('\n[移动端指板滚动回归 390×844]');
+
+  // 进入点按模式 + 选择任一弦，确保指板可交互且全品格渲染
+  await page.click('#practiceModeTab');
+  await page.waitForTimeout(400);
+  await page.click('.string-btn[data-string="1"]');
+  await page.waitForTimeout(200);
+  // 难度上限拉满到 24，确保第 24 品在范围内（置灰只改 opacity/pointer-events，不影响几何）
+  await page.$eval('#fretRangeMaxInput', (el) => { el.value = 24; el.dispatchEvent(new Event('input', { bubbles: true })); });
+  await page.waitForTimeout(200);
+
+  // 1) DOM 中应存在 0–24 全部 25 个品格
+  const fretInfo = await page.evaluate(() => {
+    const cells = document.querySelectorAll('.fretboard .fret-cell');
+    const maxFret = cells.length ? Math.max.apply(null, Array.from(cells).map((c) => Number(c.dataset.fret))) : -1;
+    const last = document.querySelector('.fretboard .fret-cell[data-fret="24"]');
+    return { total: cells.length, hasFret24: !!last, maxFret, lastWidth: last ? last.getBoundingClientRect().width : 0 };
+  });
+  check('指板 DOM 含全部 0–24 品（maxFret=24）', fretInfo.maxFret === 24, 'maxFret=' + fretInfo.maxFret + ' total=' + fretInfo.total);
+  check('存在 data-fret="24" 的品格且已渲染（width>0）', fretInfo.hasFret24 && fretInfo.lastWidth > 0, 'w=' + fretInfo.lastWidth.toFixed(1));
+
+  // 2) 指板在移动端应可横向滚动（内容宽度 > 视口宽度；旧版被裁切故不可滚动）
+  const scrollInfo = await page.evaluate(() => {
+    const sc = document.querySelector('#fretboardScroll');
+    return { scrollW: sc.scrollWidth, clientW: sc.clientWidth };
+  });
+  check('移动端指板可横向滚动（scrollWidth>clientWidth）', scrollInfo.scrollW > scrollInfo.clientW + 1, `scrollW=${scrollInfo.scrollW} clientW=${scrollInfo.clientW}`);
+
+  // 3) 滚动到最右后，第 24 品应完全进入滚动视口，可被点按
+  const reachable = await page.evaluate(() => {
+    const sc = document.querySelector('#fretboardScroll');
+    const cell = document.querySelector('.fretboard .fret-cell[data-fret="24"]');
+    sc.scrollLeft = sc.scrollWidth; // 滚到最右
+    const cRect = cell.getBoundingClientRect();
+    const sRect = sc.getBoundingClientRect();
+    return { left: cRect.left, right: cRect.right, sLeft: sRect.left, sRight: sRect.right,
+      inView: cRect.left >= sRect.left - 2 && cRect.right <= sRect.right + 2 };
+  });
+  check('滚动到最右后第 24 品完全可见（进入滚动视口）', reachable.inView, JSON.stringify(reachable));
+
+  // 恢复默认（核对模式）以便后续功能测试，不影响断言结果
+  await page.click('#browseModeTab');
+  await page.waitForTimeout(200);
 
   // 矮视口（≤760 宽且 ≤780 高）：侧栏仍为 2×2 网格，不回退单列
   await page.setViewportSize({ width: 390, height: 740 });

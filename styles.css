@@ -680,7 +680,7 @@ button { color: inherit; cursor: pointer; }
 .fretboard-scroll::-webkit-scrollbar-thumb { background: rgba(120, 120, 140, 0.4); border-radius: var(--radius-pill); }
 .fretboard-scroll:focus-visible { outline: 3px solid var(--purple-400); outline-offset: 3px; }
 .fretboard-wrap { width: 100%; }
-.fret-numbers { display: grid; grid-template-columns: clamp(24px, 4.5vw, 52px) repeat(24, minmax(24px, 1fr)); }
+.fret-numbers { display: grid; grid-template-columns: clamp(24px, 4.5vw, 52px) repeat(24, minmax(24px, 1fr)); min-width: max-content; }
 .fret-numbers { margin-bottom: 6px; font-size: 10px; font-weight: 700; text-align: center; color: var(--text-3); }
 .fret-numbers span:first-child { font-weight: 700; color: var(--text-2); }
 
@@ -690,6 +690,7 @@ button { color: inherit; cursor: pointer; }
   grid-template-columns: clamp(24px, 4.5vw, 52px) repeat(24, minmax(24px, 1fr));
   grid-template-rows: repeat(6, 30px);
   overflow: hidden;
+  min-width: max-content;
   background: linear-gradient(145deg, #ffffff, #eef0f4);
   border: var(--clay-border-sm);
   border-radius: 14px;
