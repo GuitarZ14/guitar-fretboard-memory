@@ -9,7 +9,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="chord-styles.css?v=6" />
+    <link rel="stylesheet" href="chord-styles.css?v=7" />
   </head>
   <body>
     <main class="app-shell">
@@ -27,7 +27,7 @@
         </nav>
       </header>
 
-      <!-- 三栏布局：左控制 → 中主区 → 右和弦种类（移动端重排为 主→右→左→理论） -->
+      <!-- 三栏布局：左控制 → 中主区 → 右和弦种类（移动端重排为 主→右→左） -->
       <div class="chords-layout">
         <!-- 左栏：调音与把位 + 显示选项 -->
         <aside class="layout-left reveal" aria-label="设置">
@@ -36,7 +36,7 @@
               <div class="control-icon" aria-hidden="true">♮</div>
               <div>
                 <h2>调音与把位</h2>
-                <p>调音标准、左右手与变调夹</p>
+                <p>调音标准与左右手</p>
               </div>
             </div>
             <div class="setting-block">
@@ -58,15 +58,6 @@
               <div class="segmented" id="handSwitch" role="group" aria-label="左右手配置">
                 <button type="button" data-hand="right" class="active" aria-pressed="true">右手</button>
                 <button type="button" data-hand="left" aria-pressed="false">左手</button>
-              </div>
-            </div>
-            <div class="setting-block">
-              <span class="setting-label" id="capoLabel">变调夹（0 品）</span>
-              <div class="number-field">
-                <button type="button" data-step-target="capoInput" data-step="-1" aria-label="减少变调夹品位">−</button>
-                <input id="capoInput" type="number" value="0" min="0" max="7" step="1" inputmode="numeric" aria-label="变调夹品位" />
-                <span>品</span>
-                <button type="button" data-step-target="capoInput" data-step="1" aria-label="增加变调夹品位">＋</button>
               </div>
             </div>
           </article>
@@ -114,6 +105,7 @@
               <div class="tone-chips" id="toneChips" aria-label="构成音"></div>
               <div class="interval-chips" id="intervalChips" aria-label="音程"></div>
             </div>
+            <p class="theory-desc" id="theoryDesc"></p>
           </section>
 
           <!-- 指法图 -->
@@ -163,26 +155,6 @@
           </article>
         </aside>
 
-        <!-- 理论说明：桌面位于主栏下方，移动端置于末尾 -->
-        <section class="theory-section layout-theory brutal-shadow reveal" aria-labelledby="theory-title">
-          <div class="section-heading">
-            <div>
-              <p class="section-kicker">构成与理论</p>
-              <h1 id="theory-title">和弦构成</h1>
-            </div>
-          </div>
-          <div class="theory-body">
-            <div class="theory-row">
-              <span class="theory-row-label">构成音</span>
-              <div class="tone-chips-lg" id="theoryTones"></div>
-            </div>
-            <div class="theory-row">
-              <span class="theory-row-label">音程</span>
-              <div class="interval-chips-lg" id="theoryIntervals"></div>
-            </div>
-            <p class="theory-desc" id="theoryDesc"></p>
-          </div>
-        </section>
       </div>
 
       <footer class="reveal fade-in">
@@ -191,8 +163,8 @@
       </footer>
     </main>
 
-    <script src="chord-engine.js?v=2"></script>
-    <script src="chord-app.js?v=3"></script>
+    <script src="chord-engine.js?v=3"></script>
+    <script src="chord-app.js?v=4"></script>
     <script>
       // 滚动触发入场动画：进入视口时添加 .in-view（播放一次）
       (function () {

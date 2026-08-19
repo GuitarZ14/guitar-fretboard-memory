@@ -372,8 +372,7 @@ button { color: inherit; cursor: pointer; }
   align-items: start;
   grid-template-columns: minmax(220px, 240px) minmax(0, 1fr) minmax(280px, 300px);
   grid-template-areas:
-    "left main right"
-    "left theory right";
+    "left main right";
 }
 
 .layout-left {
@@ -399,8 +398,6 @@ button { color: inherit; cursor: pointer; }
   position: sticky;
   top: 16px;
 }
-
-.layout-theory { grid-area: theory; }
 
 /* 当前和弦 Hero 卡（置于主栏顶部） */
 .hero-card {
@@ -566,38 +563,6 @@ button { color: inherit; cursor: pointer; }
 .segmented button.active::before { transform: scaleX(1); }
 .segmented button:focus-visible { outline: 3px solid var(--purple-400); outline-offset: 2px; }
 
-/* 数字步进（变调夹） */
-.number-field {
-  display: flex;
-  height: 32px;
-  width: fit-content;
-  align-items: center;
-  color: var(--text);
-  background: var(--surface);
-  border: var(--clay-border-sm);
-  border-radius: 10px;
-  box-shadow: inset 2px 2px 5px rgba(0, 0, 0, 0.07), inset -2px -2px 5px rgba(255, 255, 255, 0.8);
-}
-.number-field button {
-  width: 30px; height: 100%; padding: 0;
-  background: transparent; border: 0;
-  border-right: 1px solid rgba(120, 120, 140, 0.2);
-  color: var(--text-2);
-  font-weight: 700; font-size: 14px;
-  cursor: pointer;
-  transition: background .15s ease, color .15s ease;
-}
-.number-field button:hover { background: rgba(155, 197, 217, 0.35); color: var(--text); }
-.number-field button:last-child { border-right: 0; border-left: 1px solid rgba(120, 120, 140, 0.2); }
-.number-field input {
-  width: 38px; padding: 0; text-align: center;
-  background: transparent; border: 0; outline: 0;
-  color: var(--text); font-weight: 700; font-size: 13px;
-  appearance: textfield;
-}
-.number-field input::-webkit-inner-spin-button { display: none; }
-.number-field span { padding: 0 6px; font-size: 10px; font-weight: 700; color: var(--text-3); }
-
 /* ===================== 选择卡片 ===================== */
 .selector-section {
   padding: 16px 20px 18px;
@@ -648,10 +613,10 @@ button { color: inherit; cursor: pointer; }
   color: var(--text-3);
 }
 
-/* 根音按钮：12 格 */
+/* 根音按钮：12 个拆为两行（每行 6 个） */
 .root-buttons {
   display: grid;
-  grid-template-columns: repeat(12, 1fr);
+  grid-template-columns: repeat(6, 1fr);
   gap: 6px;
 }
 .root-btn {
@@ -890,57 +855,20 @@ button { color: inherit; cursor: pointer; }
 }
 .hint-line { width: 18px; height: 3px; border-radius: var(--radius-pill); background: var(--surface-blue); }
 
-/* ===================== 理论卡片 ===================== */
-.theory-section {
-  padding: 16px 20px 18px;
-  background: var(--surface);
-  border: var(--clay-border);
-  border-radius: 24px;
-  box-shadow: var(--shadow-clay);
-}
-.theory-body { display: flex; flex-direction: column; gap: 12px; }
-.theory-row { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
-.theory-row-label {
-  flex: 0 0 auto;
-  width: 56px;
-  font-size: 10px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-  color: var(--text-3);
-}
-.tone-chips-lg, .interval-chips-lg { display: flex; flex-wrap: wrap; gap: 8px; }
-.tone-chips-lg .chip {
-  display: grid;
-  place-items: center;
-  min-width: 46px;
-  height: 46px;
-  padding: 0 14px;
-  color: #2f5a6e;
-  background: var(--surface-blue);
-  border: var(--clay-border-sm);
-  border-radius: 14px;
-  font-weight: 800;
-  font-size: 20px;
-  box-shadow: var(--shadow-clay-blue);
-}
-.interval-chips-lg .chip {
-  padding: 5px 12px;
-  color: var(--text-2);
-  background: var(--surface);
-  border: var(--clay-border-sm);
-  border-radius: var(--radius-pill);
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  box-shadow: var(--shadow-clay-sm);
-}
+/* ===================== 和弦描述（hero 内 + 空状态复用） ===================== */
 .theory-desc {
   margin: 2px 0 0;
   font-size: 12px;
   font-weight: 500;
   line-height: 1.75;
   color: var(--text-2);
+}
+.hero-card .theory-desc {
+  text-align: center;
+  max-width: 520px;
+  margin: 6px auto 0;
+  padding-top: 12px;
+  border-top: 1px solid rgba(120, 120, 140, 0.18);
 }
 
 /* ===================== 页脚 ===================== */
@@ -1029,8 +957,7 @@ footer > span { margin-right: 2px; }
     grid-template-areas:
       "main"
       "right"
-      "left"
-      "theory";
+      "left";
     gap: 12px;
   }
   .layout-left, .layout-right { position: static; }
@@ -1051,7 +978,6 @@ footer > span { margin-right: 2px; }
 
   .selector-section,
   .fretboard-section,
-  .theory-section,
   .hero-card { padding: 12px 14px; border-radius: 18px; }
 
   .section-heading h1 { font-size: 17px; }
@@ -1080,9 +1006,6 @@ footer > span { margin-right: 2px; }
   .voicing-card { flex-direction: row; align-items: center; justify-content: center; gap: 12px; padding: 10px 12px; }
   .chord-diagram svg { max-width: 150px; }
   .voicing-tag { margin-right: 2px; }
-
-  .theory-row { gap: 10px; }
-  .theory-row-label { width: 44px; font-size: 9px; }
 
   footer { margin-top: 12px; padding: 9px 0; font-size: 8px; }
 }

@@ -793,7 +793,7 @@ function extendedVoicings(typeId, rootSemitone, tuningPitches, opts = {}) {
 /* ---------- 全指板可用位置（横向图用） ---------- */
 function fretboardPositions(root, type, tuningPitches, opts = {}) {
   const capo = opts.capo ?? 0;
-  const frets = opts.frets ?? 15;
+  const frets = opts.frets ?? 24;
   const chordSet = new Set(type.intervals.map((i) => mod12(root + i)));
   const positions = [];
   for (let si = 0; si < tuningPitches.length; si += 1) {

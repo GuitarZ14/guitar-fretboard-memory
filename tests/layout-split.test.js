@@ -7,10 +7,10 @@
  *       （可用 CHORDS_URL 环境变量覆盖，例如 CHORDS_URL=http://127.0.0.1:8088/chords.html）
  *
  * 覆盖：
- *  1. DOM 结构：三栏（.layout-left / .layout-main / .layout-right）与理论区（.layout-theory）均存在
- *  2. 桌面布局：左控制 → 中主区 → 右和弦列表 三列并排、顶部对齐；理论区位于主栏正下方；无横向溢出
- *  3. 移动布局：重排为 主区 → 和弦列表 → 控制 → 理论 的单栏顺序、无横向溢出
- *  4. 功能：根音切换 / 类型切换 / 视图切换（推荐指法 ↔ 全指板）/ 升降号 / 变调夹 / 左右手 联动
+ *  1. DOM 结构：三栏（.layout-left / .layout-main / .layout-right）与合并后的和弦信息区（hero-card 内含 #theoryDesc）均存在
+ *  2. 桌面布局：左控制 → 中主区 → 右和弦列表 三列并排、顶部对齐；无横向溢出
+ *  3. 移动布局：重排为 主区 → 和弦列表 → 控制 的单栏顺序、无横向溢出
+ *  4. 功能：根音切换 / 类型切换 / 视图切换（推荐指法 ↔ 全指板）/ 升降号 / 左右手 联动
  *  5. 视觉：黏土浅色主题、卡片具备双重阴影
  *  6. 健壮性：无 console 报错、无页面异常、无失败的资源请求
  */
@@ -70,12 +70,10 @@ async function box(page, sel) {
   const left = await box(page, '.layout-left');
   const main = await box(page, '.layout-main');
   const right = await box(page, '.layout-right');
-  const theory = await box(page, '.layout-theory');
 
   check('存在 .layout-left 左控制栏', !!left);
   check('存在 .layout-main 中主区', !!main);
   check('存在 .layout-right 右和弦列表栏', !!right);
-  check('存在 .layout-theory 理论区', !!theory);
 
   // 三列并排且顺序为 左 < 中 < 右
   check('三列顺序：左 < 中 < 右（x 递增）',
@@ -88,10 +86,12 @@ async function box(page, sel) {
     main.w > left.w * 1.4 && main.w > right.w * 1.4,
     `main.w=${main.w.toFixed(0)} left.w=${left.w.toFixed(0)} right.w=${right.w.toFixed(0)}`);
 
-  // 理论区位于主栏正下方（同一列，且在主区之下）
-  check('理论区位于主栏正下方（x 对齐 + y 在主区之下）',
-    Math.abs(theory.x - main.x) < 8 && theory.y > main.y + 4,
-    `theory.x=${theory.x.toFixed(0)} main.x=${main.x.toFixed(0)} theory.y=${theory.y.toFixed(0)} main.y=${main.y.toFixed(0)}`);
+  // 和弦描述合并进 hero-card
+  const heroDesc = await page.$('.hero-card #theoryDesc');
+  check('和弦描述合并进 hero-card（#theoryDesc 在 hero 内）', !!heroDesc);
+  const dupTones = await page.$('#theoryTones');
+  const dupIntervals = await page.$('#theoryIntervals');
+  check('构成音/音程不再重复渲染（无 #theoryTones/#theoryIntervals）', !dupTones && !dupIntervals);
 
   // 无横向溢出
   const overflow = await page.evaluate(() => ({
@@ -147,12 +147,11 @@ async function box(page, sel) {
   const mL = await box(page, '.layout-left');
   const mM = await box(page, '.layout-main');
   const mR = await box(page, '.layout-right');
-  const mT = await box(page, '.layout-theory');
 
-  // 单栏顺序：主区 → 和弦列表 → 控制 → 理论
-  check('移动端单栏顺序：主区(y) < 和弦列表(y) < 控制(y) < 理论(y)',
-    mM.y < mR.y - 10 && mR.y < mL.y - 10 && mL.y < mT.y - 10,
-    `main.y=${mM.y.toFixed(0)} right.y=${mR.y.toFixed(0)} left.y=${mL.y.toFixed(0)} theory.y=${mT.y.toFixed(0)}`);
+  // 单栏顺序：主区 → 和弦列表 → 控制
+  check('移动端单栏顺序：主区(y) < 和弦列表(y) < 控制(y)',
+    mM.y < mR.y - 10 && mR.y < mL.y - 10,
+    `main.y=${mM.y.toFixed(0)} right.y=${mR.y.toFixed(0)} left.y=${mL.y.toFixed(0)}`);
 
   // 右栏（和弦列表）在移动端应可横向滚动（类型按钮 nowrap + overflow-x）
   const scrollable = await page.evaluate(() => {
@@ -229,12 +228,10 @@ async function box(page, sel) {
   await page.click('.layout-left #accidentalSwitch button[data-acc="sharp"]');
   await page.waitForTimeout(150);
 
-  // 变调夹 +1
-  const capoBefore = await page.$eval('#capoInput', (e) => e.value);
-  await page.click('.layout-left [data-step-target="capoInput"][data-step="1"]');
-  await page.waitForTimeout(150);
-  const capoAfter = await page.$eval('#capoInput', (e) => e.value);
-  check('点击变调夹 +1 → 值递增', Number(capoAfter) === Number(capoBefore) + 1, `${capoBefore} → ${capoAfter}`);
+  // 根音按钮分为两行（第 7 个 y 明显大于第 1 个 y）
+  const r1 = await box(page, '.layout-right #rootButtons .root-btn:nth-child(1)');
+  const r7 = await box(page, '.layout-right #rootButtons .root-btn:nth-child(7)');
+  check('右栏根音按钮分为两行（6×2）', r7.y > r1.y + 4, `r1.y=${r1.y.toFixed(0)} r7.y=${r7.y.toFixed(0)}`);
 
   // 左右手切换
   await page.click('.layout-left #handSwitch button[data-hand="left"]');

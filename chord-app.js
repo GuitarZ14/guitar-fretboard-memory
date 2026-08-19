@@ -14,7 +14,6 @@ const DEFAULT_STATE = {
   handed: "right",
   accidental: "sharp",
   view: "voicing",  // voicing | fretboard
-  capo: 0,
 };
 
 function loadState() {
@@ -28,7 +27,6 @@ function loadState() {
         handed: saved.handed === "left" ? "left" : "right",
         accidental: saved.accidental === "flat" ? "flat" : "sharp",
         view: saved.view === "fretboard" ? "fretboard" : "voicing",
-        capo: Number.isFinite(saved.capo) ? Math.min(7, Math.max(0, saved.capo)) : 0,
       };
     }
   } catch {
@@ -48,8 +46,6 @@ const elements = {
   typeGroups: document.querySelector("#typeGroups"),
   tuningSelect: document.querySelector("#tuningSelect"),
   tuningDesc: document.querySelector("#tuningDesc"),
-  capoInput: document.querySelector("#capoInput"),
-  capoLabel: document.querySelector("#capoLabel"),
   resultKicker: document.querySelector("#resultKicker"),
   diagramTitle: document.querySelector("#diagram-title"),
   voicingArea: document.querySelector("#voicingArea"),
@@ -57,8 +53,6 @@ const elements = {
   voicingHint: document.querySelector("#voicingHint"),
   voicingHintText: document.querySelector("#voicingHintText"),
   diagramHint: document.querySelector("#diagramHint"),
-  theoryTones: document.querySelector("#theoryTones"),
-  theoryIntervals: document.querySelector("#theoryIntervals"),
   theoryDesc: document.querySelector("#theoryDesc"),
   handSwitch: document.querySelector("#handSwitch"),
   accidentalSwitch: document.querySelector("#accidentalSwitch"),
@@ -67,13 +61,6 @@ const elements = {
 };
 
 /* ---------------- 工具 ---------------- */
-function clampCapo() {
-  const v = Number.parseInt(elements.capoInput.value, 10);
-  const c = Number.isFinite(v) ? Math.min(7, Math.max(0, v)) : 0;
-  elements.capoInput.value = String(c);
-  return c;
-}
-
 function saveState() {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
@@ -89,7 +76,7 @@ function currentType() {
 /* 旧的 getVoicings 已替换为 extendedVoicings */
 const voicingCache = new Map();
 function getVoicings() {
-  return extendedVoicings(state.typeId, state.root, TUNINGS[state.tuningId].pitches, { capo: state.capo }).must;
+  return extendedVoicings(state.typeId, state.root, TUNINGS[state.tuningId].pitches).must;
 }
 
 /* ---------------- 构建静态控件 ---------------- */
@@ -267,7 +254,7 @@ function buildVoicingSVG(v, type, tuning) {
 
 /* ---------------- 全指板横向图 SVG ---------------- */
 function buildFullFretboardSVG(type, tuning) {
-  const maxFret = 15;
+  const maxFret = 24;
   const pad = { t: 26, r: 16, b: 20, l: 34 };
   const colW = 34;
   const rowH = 30;
@@ -276,7 +263,6 @@ function buildFullFretboardSVG(type, tuning) {
   const h = pad.t + 6 * rowH + pad.b;
 
   const positions = fretboardPositions(state.root, type, tuning.pitches, {
-    capo: state.capo,
     frets: maxFret,
   });
 
@@ -306,24 +292,16 @@ function buildFullFretboardSVG(type, tuning) {
   });
 
   // 品记
-  const singleInlays = [3, 5, 7, 9, 15];
+  const singleInlays = [3, 5, 7, 9, 15, 17, 19, 21];
   singleInlays.forEach((f) => {
     const x = pad.l + f * colW + colW / 2;
     parts.push(`<circle cx="${x}" cy="${pad.t + 3 * rowH}" r="5" fill="rgba(120,120,140,0.35)"/>`);
   });
-  [12].forEach((f) => {
+  [12, 24].forEach((f) => {
     const x = pad.l + f * colW + colW / 2;
     parts.push(`<circle cx="${x}" cy="${pad.t + 2.5 * rowH}" r="5" fill="rgba(120,120,140,0.35)"/>`);
     parts.push(`<circle cx="${x}" cy="${pad.t + 4.5 * rowH}" r="5" fill="rgba(120,120,140,0.35)"/>`);
   });
-
-  // capo 标记
-  if (state.capo > 0) {
-    const x = pad.l + state.capo * colW;
-    parts.push(
-      `<line x1="${x}" y1="${pad.t - 2}" x2="${x}" y2="${pad.t + 6 * rowH + 2}" stroke="#f5a69c" stroke-width="3" stroke-dasharray="6 4"/>`
-    );
-  }
 
   // 和弦音位置
   positions.forEach((p) => {
@@ -365,11 +343,6 @@ function renderHero() {
   void elements.chordNameCard.offsetWidth;
   elements.chordNameCard.classList.add("pop");
 
-  // 理论卡片
-  elements.theoryTones.innerHTML = semis
-    .map((s) => chip("tone-chip", noteName(s, state.accidental)))
-    .join("");
-  elements.theoryIntervals.innerHTML = type.labels.map((l) => chip("interval-chip", l)).join("");
   elements.theoryDesc.textContent = type.desc;
 }
 
@@ -396,13 +369,13 @@ function renderVoicings() {
     const legend = document.querySelector(".legend");
     if (legend) legend.hidden = false;
 
-    const groups = extendedVoicings(state.typeId, state.root, tuning.pitches, { capo: state.capo });
-    const total = groups.must.length + groups.open.length + groups.moveable.length + groups.capo.length;
+    const groups = extendedVoicings(state.typeId, state.root, tuning.pitches);
+    const total = groups.must.length + groups.open.length + groups.moveable.length;
 
     if (total === 0) {
       elements.voicingArea.innerHTML = `
         <div class="theory-desc" style="padding: 18px 4px; text-align: center;">
-          当前调音 + 变调夹组合下未找到合适的完整指法，
+          当前调音下未找到合适的完整指法，
           可切换到「全指板」视图查看所有可用位置。
         </div>`;
       elements.voicingHint.classList.remove("visible");
@@ -420,9 +393,9 @@ function renderVoicings() {
               .map(
                 (v, i) => `
               <figure class="voicing-card">
-                <span class="voicing-tag">${v._capoVariant ? "CAPO " + v.capo : voicingTag(v, i, group)}</span>
+                <span class="voicing-tag">${voicingTag(v, i, group)}</span>
                 <div class="chord-diagram">${buildVoicingSVG(v, type, tuning)}</div>
-                <figcaption class="voicing-meta">${voicingMeta(v, tuning)}${v._capoVariant ? " · CAPO " + v.capo + " 品" : ""}</figcaption>
+                <figcaption class="voicing-meta">${voicingMeta(v, tuning)}</figcaption>
               </figure>`
               )
               .join("")}
@@ -432,14 +405,12 @@ function renderVoicings() {
     elements.voicingArea.innerHTML =
       sectionHTML("MUST KNOW 必学", groups.must, "must") +
       sectionHTML("OPEN CHORDS 开放和弦", groups.open, "open") +
-      sectionHTML("MOVEABLE 可移位", groups.moveable, "moveable") +
-      sectionHTML("CAPO 变调夹", groups.capo, "capo");
+      sectionHTML("MOVEABLE 可移位", groups.moveable, "moveable");
 
     elements.voicingHint.classList.add("visible");
     elements.voicingHintText.textContent = `${total} 个指法`;
-    const capoTxt = state.capo > 0 ? `（变调夹 ${state.capo} 品）` : "";
     elements.diagramHint.innerHTML =
-      `<span class="hint-line"></span> 弦序：${orderString(tuning)} · 数字为品位${capoTxt}；切换调音 / 左右手 / cap，会同步刷新指法与全指板。`;
+      `<span class="hint-line"></span> 弦序：${orderString(tuning)} · 数字为品位；切换调音 / 左右手，会同步刷新指法与全指板。`;
   } else {
     elements.voicingArea.hidden = true;
     elements.fretboardArea.hidden = false;
@@ -451,10 +422,9 @@ function renderVoicings() {
         ${buildFullFretboardSVG(type, tuning)}
       </div>`;
     elements.voicingHint.classList.add("visible");
-    elements.voicingHintText.textContent = "0–15 品";
-    const capoTxt = state.capo > 0 ? `（变调夹 ${state.capo} 品）` : "";
+    elements.voicingHintText.textContent = "0–24 品";
     elements.diagramHint.innerHTML =
-      `<span class="hint-line"></span> 深蓝为根音，桃色为和弦构成音${capoTxt}，可横向滚动查看。`;
+      `<span class="hint-line"></span> 深蓝为根音，桃色为和弦构成音，可横向滚动查看。`;
   }
 }
 
@@ -477,8 +447,6 @@ function voicingMeta(v, tuning) {
 function renderSettings() {
   elements.tuningSelect.value = state.tuningId;
   elements.tuningDesc.textContent = TUNINGS[state.tuningId].desc;
-  elements.capoInput.value = String(state.capo);
-  elements.capoLabel.textContent = `变调夹（${state.capo} 品）`;
   refreshSegmented(elements.handSwitch, "hand", state.handed);
   refreshSegmented(elements.accidentalSwitch, "acc", state.accidental);
   refreshSegmented(elements.viewSwitch, "view", state.view);
@@ -531,23 +499,6 @@ elements.viewSwitch.addEventListener("click", (e) => {
   if (!btn) return;
   state.view = btn.dataset.view;
   renderAll();
-});
-
-elements.capoInput.addEventListener("change", () => {
-  state.capo = clampCapo();
-  renderAll();
-});
-elements.capoInput.addEventListener("input", () => {
-  clampCapo();
-});
-
-document.querySelectorAll("[data-step-target]").forEach((button) => {
-  button.addEventListener("click", () => {
-    const input = document.querySelector(`#${button.dataset.stepTarget}`);
-    input.value = String(Number(input.value) + Number(button.dataset.step));
-    state.capo = clampCapo();
-    renderAll();
-  });
 });
 
 /* ---------------- 初始化 ---------------- */
