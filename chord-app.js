@@ -122,7 +122,7 @@ function buildTypeButtons() {
       btn.type = "button";
       btn.className = "type-btn";
       btn.dataset.type = t.id;
-      btn.textContent = t.suffix === "" ? "大" : t.suffix;
+      btn.textContent = t.suffix === "" ? "M" : t.suffix;
       btn.title = `${t.cn}（${t.desc.slice(0, 24)}…）`;
       btns.append(btn);
     });
