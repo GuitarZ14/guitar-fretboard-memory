@@ -51,12 +51,9 @@ async function inRangeCount(page) {
   await page.goto(URL, { waitUntil: "networkidle" });
   await page.waitForSelector("#stringButtons .string-btn");
 
-  // 1. 默认六弦全部未选中（灰色）
-  const defaultInactive = await page.evaluate(() => {
-    const btns = [...document.querySelectorAll("#stringButtons .string-btn")];
-    return btns.length === 6 && btns.every((b) => !b.classList.contains("active"));
-  });
-  assert(defaultInactive, "默认六弦按钮全部 inactive（灰），无自动点亮");
+  // 1. 默认仅点亮 6 弦（低音 E 弦，便于进入点按模式即可直接点按）
+  const defaultActive = await activeStrings(page);
+  assert(JSON.stringify(defaultActive) === JSON.stringify(["6"]), `默认仅 6 弦 active（实际 ${defaultActive.join(",")}）`);
 
   // 2. 核对模式不应用难度筛选：全部 150 格均不 dimmed
   let dim = await dimmedCount(page);
@@ -72,23 +69,30 @@ async function inRangeCount(page) {
   });
   assert(pointerNone, "核对模式下弦按钮 pointer-events:none（禁止点击）");
 
-  // 4. 切到点按模式（默认空集）：全部 150 格 dimmed（默认全灰）
+  // 4. 切到点按模式：默认保留 6 弦，0-12 品未 dimmed；dim = 150 - 13 = 137
   await page.click("#practiceModeTab");
   await page.waitForTimeout(400);
   const practiceEnabled = await page.evaluate(() =>
     !document.querySelector("#difficultyCard").classList.contains("disabled"));
   assert(practiceEnabled, "点按模式下难度卡片启用");
+  assert(JSON.stringify(await activeStrings(page)) === JSON.stringify(["6"]), "点按模式初始保留默认 6 弦");
   dim = await dimmedCount(page);
-  assert(dim === 150, `点按模式默认空集 dimmed=150（实际 ${dim}）`);
-  assert((await activeStrings(page)).length === 0, "点按模式初始仍无任何弦被选中");
+  assert(dim === 137, `点按模式默认 6 弦 dimmed=137（实际 ${dim}）`);
 
-  // 5. 点击「一弦」→ 选中；仅一弦 0-12 品未 dimmed；dim = 150 - 13 = 137
+  // 5. 追加「一弦」→ 一、六弦 active；dim = 150 - 2*13 = 124
   await page.click('#stringButtons .string-btn[data-string="1"]');
   await page.waitForTimeout(300);
-  assert(JSON.stringify(await activeStrings(page)) === JSON.stringify(["1"]), "点击后仅一弦 active");
+  assert(JSON.stringify(await activeStrings(page)) === JSON.stringify(["1", "6"]), "追加一弦后一、六弦 active");
+  dim = await dimmedCount(page);
+  assert(dim === 124, `选一、六弦后 dimmed=124（实际 ${dim}）`);
+
+  // 6. 取消「六弦」→ 仅一弦 active；验证 in-range 高亮
+  await page.click('#stringButtons .string-btn[data-string="6"]');
+  await page.waitForTimeout(300);
+  assert(JSON.stringify(await activeStrings(page)) === JSON.stringify(["1"]), "取消六弦后仅一弦 active");
   assert(await stringInRangeNotDimmed(page, 1, 12), "一弦 0-12 品范围未 dimmed");
   dim = await dimmedCount(page);
-  assert(dim === 137, `选一弦后 dimmed=137（实际 ${dim}）`);
+  assert(dim === 137, `仅一弦 active 时 dimmed=137（实际 ${dim}）`);
   const ir = await inRangeCells(page, 1, 12);
   assert(ir.inAll, "点按模式：选定弦 0-12 品范围内均带 in-range 高亮类");
   assert(ir.outNone, "点按模式：选定弦 12 品之外的格子不带 in-range 类");
@@ -103,35 +107,37 @@ async function inRangeCount(page) {
   assert(irStyle.bg.includes("gradient"), "in-range 单元格应用渐变高亮背景填充（非透明）");
   assert(irStyle.shadow !== "none", "in-range 单元格带描边/外发光阴影（与 dimmed 形成强对比）");
 
-  // 6. 多选「二弦」→ 一、二弦 active；dim = 150 - 2*13 = 124
+  // 7. 多选「二弦」→ 一、二弦 active；dim = 150 - 2*13 = 124
   await page.click('#stringButtons .string-btn[data-string="2"]');
   await page.waitForTimeout(300);
   assert(JSON.stringify(await activeStrings(page)) === JSON.stringify(["1", "2"]), "多选后一、二弦均 active");
   dim = await dimmedCount(page);
   assert(dim === 124, `选一、二弦后 dimmed=124（实际 ${dim}）`);
 
-  // 7. 取消「一弦」→ 仅二弦 active；dim = 150 - 13 = 137
+  // 8. 取消「一弦」→ 仅二弦 active；dim = 150 - 13 = 137
   await page.click('#stringButtons .string-btn[data-string="1"]');
   await page.waitForTimeout(300);
   assert(JSON.stringify(await activeStrings(page)) === JSON.stringify(["2"]), "取消一弦后仅二弦 active");
   dim = await dimmedCount(page);
   assert(dim === 137, `取消一弦后 dimmed=137（实际 ${dim}）`);
 
-  // 8. 自由切换允许回到空集：取消最后一根 → 0 根；再次点击 → 1 根
+  // 9. 自由切换允许回到空集：取消最后一根 → 0 根；再次点击 → 1 根
   await page.click('#stringButtons .string-btn[data-string="2"]');
   await page.waitForTimeout(300);
   assert((await activeStrings(page)).length === 0, "取消最后一根弦后被允许为空（0 根）");
+  dim = await dimmedCount(page);
+  assert(dim === 150, `空集时 dimmed=150（实际 ${dim}）`);
   await page.click('#stringButtons .string-btn[data-string="2"]');
   await page.waitForTimeout(300);
   assert((await activeStrings(page)).length === 1, "空集下再次点击可重新选中（1 根）");
 
-  // 9. 持久化子集：选中弦 2 后 reload，保留 1 根（非全选不被视为默认）
+  // 10. 持久化子集：选中弦 2 后 reload，保留 1 根
   await page.reload({ waitUntil: "networkidle" });
   await page.waitForSelector("#stringButtons .string-btn");
   const persisted = await activeStrings(page);
   assert(persisted.length === 1 && persisted[0] === "2", `reload 后弦组选择持久化（剩 ${persisted.join(",")}）`);
 
-  // 10. 无 console / page 错误
+  // 11. 无 console / page 错误
   assert(errors.length === 0, `无运行时错误（${errors.length} 条）` + (errors.length ? " -> " + errors.join(" | ") : ""));
 
   await page.screenshot({ path: "tests/shot-string-group.png", fullPage: true });

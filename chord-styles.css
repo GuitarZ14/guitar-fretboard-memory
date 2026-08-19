@@ -181,12 +181,45 @@ button { color: inherit; cursor: pointer; }
 .tool-link:active { transform: translateY(1px); }
 .tool-link:focus-visible { outline: 3px solid var(--purple-400); outline-offset: 2px; }
 
+/* 顶栏双 Tab 切换器（指板练习 ↔ 和弦速查） */
+.tool-nav.tabs {
+  gap: 4px;
+  padding: 4px;
+  margin-right: 8px;
+  background: rgba(15, 23, 42, 0.04);
+  border-radius: var(--radius-pill);
+}
+.tool-tab {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 7px 16px;
+  border-radius: var(--radius-pill);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: #64748b;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: transform .2s ease, box-shadow .2s ease, filter .2s ease, background .2s ease, color .2s ease;
+}
+.tool-tab:hover { color: #2f5a6e; }
+.tool-tab.active {
+  color: #2f5a6e;
+  background: var(--surface-blue);
+  box-shadow: var(--shadow-clay-blue);
+}
+.tool-tab.active:hover { filter: brightness(1.05); }
+.tool-tab:active { transform: translateY(1px); }
+.tool-tab:focus-visible { outline: 3px solid var(--purple-400); outline-offset: 2px; }
+
 @media (min-width: 1041px) {
   .topbar { min-height: 72px; padding: 12px 22px; margin-bottom: 22px; }
   .brand-mark { width: 44px; height: 44px; font-size: 26px; border-radius: 14px; }
   .brand strong { font-size: 17px; }
   .brand small { font-size: 10px; }
   .tool-link { padding: 9px 16px; font-size: 12px; }
+  .tool-tab { padding: 9px 18px; font-size: 13px; }
 }
 
 /* ===================== 当前和弦 Hero ===================== */
@@ -933,6 +966,8 @@ footer > span { margin-right: 2px; }
   .brand strong { font-size: 12px; }
   .brand small { font-size: 8px; }
   .tool-link { padding: 6px 10px; font-size: 9px; }
+  .tool-nav.tabs { padding: 3px; margin-right: 0; }
+  .tool-tab { padding: 5px 10px; font-size: 10px; }
 
   .chord-hero { padding: 2px 0 10px; }
   .hero-orbs { height: 190px; top: -10px; }

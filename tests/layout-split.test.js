@@ -84,6 +84,15 @@ async function box(page, sel) {
   }));
   check('无横向溢出', overflow.scrollW <= overflow.clientW + 2, `scrollW=${overflow.scrollW} clientW=${overflow.clientW}`);
 
+  // 顶栏双 Tab 切换器（指板练习 ↔ 和弦速查）
+  const topTabs = await page.$$eval('.tool-nav.tabs .tool-tab', (els) => els.map((e) => ({
+    text: e.textContent.trim(),
+    active: e.classList.contains('active'),
+    href: e.getAttribute('href'),
+  })));
+  check('顶栏存在「指板练习 / 和弦速查」双 Tab', topTabs.length === 2 && topTabs[0].text === '指板练习' && topTabs[1].text === '和弦速查');
+  check('当前页「指板练习」Tab 高亮', topTabs[0].active && !topTabs[1].active && topTabs[0].href === 'index.html' && topTabs[1].href === 'chords.html');
+
   // 四张控制卡片都在侧栏内
   const cardsInSidebar = await page.$$eval('.sidebar-controls .control-card', (els) => els.map((e) => e.id));
   check('侧栏含 4 张控制卡片', cardsInSidebar.length === 4, cardsInSidebar.join(','));
