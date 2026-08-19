@@ -55,19 +55,19 @@ async function inRangeCount(page) {
   const defaultActive = await activeStrings(page);
   assert(JSON.stringify(defaultActive) === JSON.stringify(["6"]), `默认仅 6 弦 active（实际 ${defaultActive.join(",")}）`);
 
-  // 2. 核对模式不应用难度筛选：全部 150 格均不 dimmed
+  // 2. 查看模式不应用难度筛选：全部 150 格均不 dimmed
   let dim = await dimmedCount(page);
-  assert(dim === 0, `核对模式默认 dimmed=0（实际 ${dim}）`);
+  assert(dim === 0, `查看模式默认 dimmed=0（实际 ${dim}）`);
 
-  // 3. 核对模式：难度卡片 disabled，弦按钮不可点击
+  // 3. 查看模式：难度卡片 disabled，弦按钮不可点击
   const browseDisabled = await page.evaluate(() =>
     document.querySelector("#difficultyCard").classList.contains("disabled"));
-  assert(browseDisabled, "核对模式下难度卡片为 disabled");
+  assert(browseDisabled, "查看模式下难度卡片为 disabled");
   const pointerNone = await page.evaluate(() => {
     const cs = getComputedStyle(document.querySelector("#stringButtons .string-btn"));
     return cs.pointerEvents === "none";
   });
-  assert(pointerNone, "核对模式下弦按钮 pointer-events:none（禁止点击）");
+  assert(pointerNone, "查看模式下弦按钮 pointer-events:none（禁止点击）");
 
   // 4. 切到点按模式：默认保留 6 弦，0-12 品未 dimmed；dim = 150 - 13 = 137
   await page.click("#practiceModeTab");

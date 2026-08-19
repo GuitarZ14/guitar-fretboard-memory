@@ -403,7 +403,7 @@ button { color: inherit; cursor: pointer; }
 }
 .accidental-card .control-icon,
 .difficulty-card .control-icon { font-size: 14px; }
-/* 自动显示答案 = 薄荷；升降号 = 桃；难度 = 丁香 */
+/* 自动模式 = 薄荷；升降号 = 桃；难度 = 丁香 */
 #autoRevealCard .control-icon { background: var(--surface-mint); color: #2f6b3a; box-shadow: var(--shadow-clay-mint); }
 .accidental-card .control-icon { background: var(--surface-pink); color: #7a4a44; box-shadow: var(--shadow-clay-pink); }
 .difficulty-card .control-icon { background: var(--surface-lilac); color: #4a4a6e; box-shadow: var(--shadow-clay-lilac); }
@@ -461,6 +461,8 @@ button { color: inherit; cursor: pointer; }
 .number-field span { padding: 0 6px; font-size: 10px; font-weight: 700; color: var(--text-3); }
 .speed-fields { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .equals { font-size: 14px; font-weight: 700; color: var(--text-3); }
+.speed-line { display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; }
+.setting-row#autoRevealSetting { flex-direction: column; align-items: stretch; gap: 8px; }
 
 .timer-track { position: absolute; right: 0; bottom: 0; left: 0; height: 4px; background: rgba(120, 120, 140, 0.14); }
 .timer-track span { display: block; width: 0; height: 100%; background: var(--surface-blue); border-radius: 0 4px 4px 0; }
@@ -1070,11 +1072,8 @@ kbd { padding: 3px 6px; color: var(--text-2); background: var(--surface); border
   .sidebar-controls .range-track-wrap { height: 24px; }
   .sidebar-controls .range-track-wrap input[type="range"]::-webkit-slider-thumb { width: 16px; height: 22px; margin-top: -10px; }
   .sidebar-controls .range-track-wrap input[type="range"]::-moz-range-thumb { width: 16px; height: 22px; }
-  /* 自动切换卡片：窄列内将速度输入竖排，避免溢出 */
-  .sidebar-controls #autoNextCard .setting-row { flex-direction: column; align-items: stretch; gap: 6px; }
-  .sidebar-controls #autoNextCard .speed-fields { display: flex; flex-direction: column; align-items: stretch; gap: 6px; }
-  .sidebar-controls #autoNextCard .equals { display: none; }
-  .sidebar-controls #autoNextCard .number-field { width: 100%; justify-content: space-between; }
+  /* 自动模式卡片已上移为首位，无需特殊竖排；难度卡片占满整行，避免 2×2 网格出现空位 */
+  .sidebar-controls .difficulty-card { grid-column: 1 / -1; }
   /* 难度卡片：弦组按钮收为单行 6 列、隐藏提示，进一步压低高度贴近正方形 */
   .sidebar-controls .difficulty-card .string-select-hint { display: none; }
   .sidebar-controls .difficulty-card .string-select-head { margin-bottom: 5px; }
@@ -1147,11 +1146,7 @@ kbd { padding: 3px 6px; color: var(--text-2); background: var(--surface); border
   .sidebar-controls .fret-range-slider { margin-top: 5px; }
   .sidebar-controls .range-values { font-size: 13px; margin-bottom: 3px; }
   .sidebar-controls .range-track-wrap { height: 16px; }
-  /* 自动切换卡片：窄列内竖排速度输入 */
-  .sidebar-controls #autoNextCard .setting-row { flex-direction: column; align-items: stretch; gap: 4px; margin-top: 4px; padding-top: 4px; }
-  .sidebar-controls #autoNextCard .speed-fields { display: flex; flex-direction: column; align-items: stretch; gap: 4px; }
-  .sidebar-controls #autoNextCard .equals { display: none; }
-  .sidebar-controls #autoNextCard .number-field { width: 100%; justify-content: space-between; }
+  .sidebar-controls .difficulty-card { grid-column: 1 / -1; }
   /* 难度卡片：进一步压缩 */
   .sidebar-controls .difficulty-card .string-select-hint { display: none; }
   .sidebar-controls .difficulty-card .string-select-head { margin-bottom: 3px; }

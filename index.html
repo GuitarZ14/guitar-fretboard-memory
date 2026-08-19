@@ -34,38 +34,40 @@
       <!-- 方案三：桌面左右分栏 —— 左：练习设置侧栏；右：音名 + 指板 -->
       <div class="layout-split">
         <aside class="sidebar-controls reveal" aria-label="练习设置">
-          <article class="control-card brutal-shadow reveal stagger-1" id="autoNextCard">
+          <article class="control-card brutal-shadow reveal stagger-1" id="autoRevealCard">
             <div class="control-title-row">
-              <div class="control-icon" aria-hidden="true">↻</div>
+              <div class="control-icon" aria-hidden="true">◎</div>
               <div>
-                <h2>自动切换</h2>
-                <p>每一拍抽取下一个音名</p>
+                <h2>自动模式</h2>
+                <p>延时显示答案并自动进入下一题</p>
               </div>
               <label class="switch">
-                <input id="autoNextToggle" type="checkbox" />
+                <input id="autoRevealToggle" type="checkbox" />
                 <span class="switch-track"><span class="switch-thumb"></span></span>
-                <span class="sr-only">开启自动切换</span>
+                <span class="sr-only">开启自动模式</span>
               </label>
             </div>
-            <div class="setting-row" id="autoNextSetting">
-              <span>切换速度</span>
-              <div class="speed-fields">
+            <div class="setting-row" id="autoRevealSetting">
+              <div class="speed-line">
+                <label for="autoRevealAtSeconds">显示秒</label>
                 <div class="number-field">
-                  <button type="button" data-step-target="autoNextSeconds" data-step="-1" aria-label="减少切换秒数">−</button>
-                  <input id="autoNextSeconds" type="number" value="5" min="1" max="20" step="1" inputmode="numeric" aria-label="切换秒数" />
+                  <button type="button" data-step-target="autoRevealAtSeconds" data-step="-1" aria-label="减少显示秒数">−</button>
+                  <input id="autoRevealAtSeconds" type="number" value="5" min="1" max="60" step="1" inputmode="numeric" aria-label="答案显示秒数" />
                   <span>秒</span>
-                  <button type="button" data-step-target="autoNextSeconds" data-step="1" aria-label="增加切换秒数">＋</button>
+                  <button type="button" data-step-target="autoRevealAtSeconds" data-step="1" aria-label="增加显示秒数">＋</button>
                 </div>
-                <span class="equals">＝</span>
+              </div>
+              <div class="speed-line">
+                <label for="autoRevealHoldSeconds">维持秒</label>
                 <div class="number-field">
-                  <button type="button" data-step-target="autoNextBpm" data-step="-5" aria-label="降低 BPM">−</button>
-                  <input id="autoNextBpm" type="number" value="12" min="3" max="60" step="1" inputmode="numeric" aria-label="切换 BPM" />
-                  <span>BPM</span>
-                  <button type="button" data-step-target="autoNextBpm" data-step="5" aria-label="提高 BPM">＋</button>
+                  <button type="button" data-step-target="autoRevealHoldSeconds" data-step="-1" aria-label="减少维持秒数">−</button>
+                  <input id="autoRevealHoldSeconds" type="number" value="5" min="1" max="60" step="1" inputmode="numeric" aria-label="答案维持秒数" />
+                  <span>秒</span>
+                  <button type="button" data-step-target="autoRevealHoldSeconds" data-step="1" aria-label="增加维持秒数">＋</button>
                 </div>
               </div>
             </div>
-            <div class="timer-track" aria-hidden="true"><span id="nextProgress"></span></div>
+            <div class="timer-track" aria-hidden="true"><span id="revealProgress"></span></div>
           </article>
 
           <article class="control-card accidental-card brutal-shadow reveal stagger-1" id="accidentalsCard">
@@ -81,31 +83,6 @@
                 <span class="sr-only">题库包含升降号</span>
               </label>
             </div>
-          </article>
-
-          <article class="control-card brutal-shadow reveal stagger-2" id="autoRevealCard">
-            <div class="control-title-row">
-              <div class="control-icon" aria-hidden="true">◎</div>
-              <div>
-                <h2>自动显示答案</h2>
-                <p>抽取音名后延时显示所有位置</p>
-              </div>
-              <label class="switch">
-                <input id="autoRevealToggle" type="checkbox" />
-                <span class="switch-track"><span class="switch-thumb"></span></span>
-                <span class="sr-only">开启自动显示答案</span>
-              </label>
-            </div>
-            <div class="setting-row" id="autoRevealSetting">
-              <label for="autoRevealSeconds">显示延时</label>
-              <div class="number-field">
-                <button type="button" data-step-target="autoRevealSeconds" data-step="-1" aria-label="减少答案延时">−</button>
-                <input id="autoRevealSeconds" type="number" value="5" min="1" max="60" inputmode="numeric" />
-                <span>秒</span>
-                <button type="button" data-step-target="autoRevealSeconds" data-step="1" aria-label="增加答案延时">＋</button>
-              </div>
-            </div>
-            <div class="timer-track" aria-hidden="true"><span id="revealProgress"></span></div>
           </article>
 
           <article class="control-card difficulty-card brutal-shadow reveal stagger-2" id="difficultyCard">
@@ -188,12 +165,12 @@
           <section class="fretboard-section brutal-shadow reveal" aria-labelledby="fretboard-title">
             <div class="section-heading">
               <div>
-                <p class="section-kicker" id="sectionKicker">核对区域</p>
+                <p class="section-kicker" id="sectionKicker">查看区域</p>
                 <h1 id="fretboard-title">六弦吉他指板</h1>
               </div>
 
-              <div class="mode-tabs" role="tablist" aria-label="模式切换（核对 / 点按）">
-                <button class="mode-tab active" id="browseModeTab" type="button" role="tab" aria-selected="true" data-mode="browse">核对</button>
+              <div class="mode-tabs" role="tablist" aria-label="模式切换（查看 / 点按）">
+                <button class="mode-tab active" id="browseModeTab" type="button" role="tab" aria-selected="true" data-mode="browse">查看</button>
                 <button class="mode-tab" id="practiceModeTab" type="button" role="tab" aria-selected="false" data-mode="practice">点按</button>
               </div>
 
@@ -246,7 +223,7 @@
       </div>
     </div>
 
-    <script src="app.js?v=13"></script>
+    <script src="app.js?v=14"></script>
     <script>
       // 滚动触发入场动画：进入视口时添加 .in-view（播放一次）
       (function () {

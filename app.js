@@ -1,7 +1,7 @@
 /* GUITAR 指板记忆
  * 在参考站（cbs.lljy.de 贝斯指板记忆）的基础上改造：
  * - 指板替换为六弦标准吉他（E A D G B E，从上到下为 1~6 弦）
- * - 完整保留原站交互：乱序出题、自动切换/自动显示答案、包含升降号、
+ * - 完整保留原站交互：乱序出题、自动模式、包含升降号、
  *   快捷键、练习次数持久化
  * - 新增「练习模式」：点击指板作答、即时对错反馈、难度分级、计分与成绩汇总
  */
@@ -371,12 +371,9 @@ const elements = {
   nextButton: document.querySelector("#nextButton"),
   instruction: document.querySelector("#instruction"),
   sectionKicker: document.querySelector("#sectionKicker"),
-  autoNextToggle: document.querySelector("#autoNextToggle"),
-  autoNextSeconds: document.querySelector("#autoNextSeconds"),
-  autoNextBpm: document.querySelector("#autoNextBpm"),
-  autoNextSetting: document.querySelector("#autoNextSetting"),
   autoRevealToggle: document.querySelector("#autoRevealToggle"),
-  autoRevealSeconds: document.querySelector("#autoRevealSeconds"),
+  autoRevealAtSeconds: document.querySelector("#autoRevealAtSeconds"),
+  autoRevealHoldSeconds: document.querySelector("#autoRevealHoldSeconds"),
   autoRevealSetting: document.querySelector("#autoRevealSetting"),
   autoRevealCard: document.querySelector("#autoRevealCard"),
   accidentalsToggle: document.querySelector("#accidentalsToggle"),
@@ -405,7 +402,6 @@ const elements = {
   summaryAvg: document.querySelector("#summaryAvg"),
   summaryBest: document.querySelector("#summaryBest"),
   summaryAgain: document.querySelector("#summaryAgain"),
-  nextProgress: document.querySelector("#nextProgress"),
   revealProgress: document.querySelector("#revealProgress"),
 };
 
@@ -494,16 +490,6 @@ function setNumber(input, value) {
   const decimals = input.step.includes(".") ? 2 : 0;
   input.value = String(Number(value.toFixed(decimals)));
   clampNumber(input);
-}
-
-function syncSpeed(changed) {
-  clampNumber(changed);
-  if (changed === elements.autoNextSeconds) {
-    setNumber(elements.autoNextBpm, 60 / Number(elements.autoNextSeconds.value));
-  } else {
-    setNumber(elements.autoNextSeconds, 60 / Number(elements.autoNextBpm.value));
-  }
-  state.startedAt = performance.now();
 }
 
 /**
@@ -851,7 +837,7 @@ function setMode(mode) {
     mode === "practice"
       ? "点击指板上对应位置作答，答完自动进入下一题。"
       : "在吉他上弹出这个音的任意位置，然后查看答案。";
-  elements.sectionKicker.textContent = mode === "practice" ? "点按区域" : "核对区域";
+  elements.sectionKicker.textContent = mode === "practice" ? "点按区域" : "查看区域";
 
   if (state.summaryOpen) closeSummary();
 
@@ -929,14 +915,12 @@ function newRound() {
 
 function syncControlState() {
   const practice = state.mode === "practice";
-  elements.autoNextSetting.classList.toggle("enabled", elements.autoNextToggle.checked);
   elements.autoRevealSetting.classList.toggle("enabled", elements.autoRevealToggle.checked && !practice);
   elements.autoRevealCard.classList.toggle("disabled", practice);
   // 练习难度卡片：仅练习模式可交互并高亮，浏览模式禁用并灰化
   elements.difficultyCard.classList.toggle("disabled", !practice);
   elements.difficultyCard.classList.toggle("highlight", practice);
   state.startedAt = performance.now();
-  if (!elements.autoNextToggle.checked) elements.nextProgress.style.width = "0";
   if (!elements.autoRevealToggle.checked) elements.revealProgress.style.width = "0";
 }
 
@@ -976,23 +960,23 @@ function timerLoop(now) {
     const elapsed = now - state.startedAt;
     const practice = state.mode === "practice";
 
-    // 自动显示答案：练习模式作答时禁用，避免提前泄露
-    if (!practice && elements.autoRevealToggle.checked && !state.answerVisible) {
-      const revealDuration = clampNumber(elements.autoRevealSeconds) * 1000;
-      const revealRatio = Math.min(1, elapsed / revealDuration);
-      elements.revealProgress.style.width = `${revealRatio * 100}%`;
-      if (revealRatio >= 1) setAnswerVisible(true);
+    // 自动模式：浏览模式下，延时到「显示秒」时亮出答案，保持「维持秒」后自动进入下一题
+    if (!practice && elements.autoRevealToggle.checked && !state.summaryOpen) {
+      const atMs = clampNumber(elements.autoRevealAtSeconds) * 1000;
+      const holdMs = clampNumber(elements.autoRevealHoldSeconds) * 1000;
+      const totalMs = atMs + holdMs;
+      const cycleRatio = Math.min(1, elapsed / totalMs);
+      elements.revealProgress.style.width = `${cycleRatio * 100}%`;
+      if (elapsed >= atMs && elapsed < totalMs) {
+        if (!state.answerVisible) setAnswerVisible(true);
+      } else if (elapsed >= totalMs) {
+        if (state.answerVisible) setAnswerVisible(false);
+        newRound();
+      } else if (state.answerVisible) {
+        setAnswerVisible(false);
+      }
     } else {
       elements.revealProgress.style.width = "0";
-    }
-
-    if (elements.autoNextToggle.checked && !state.summaryOpen) {
-      const nextDuration = clampNumber(elements.autoNextSeconds) * 1000;
-      const nextRatio = Math.min(1, elapsed / nextDuration);
-      elements.nextProgress.style.width = `${nextRatio * 100}%`;
-      if (nextRatio >= 1) newRound();
-    } else {
-      elements.nextProgress.style.width = "0";
     }
   } catch (err) {
     // 静默吞掉单帧异常，动画循环继续
@@ -1005,7 +989,6 @@ function timerLoop(now) {
 
 elements.nextButton.addEventListener("click", newRound);
 elements.revealButton.addEventListener("click", handleReveal);
-elements.autoNextToggle.addEventListener("change", syncControlState);
 elements.autoRevealToggle.addEventListener("change", syncControlState);
 elements.accidentalsToggle.addEventListener("change", () => {
   if (state.mode === "practice") {
@@ -1039,16 +1022,11 @@ elements.summaryAgain.addEventListener("click", () => {
   startPracticeRound();
 });
 
-[elements.autoNextSeconds, elements.autoNextBpm, elements.autoRevealSeconds].forEach((input) => {
-  input.addEventListener("input", () => {
-    if (input === elements.autoNextSeconds || input === elements.autoNextBpm) syncSpeed(input);
-  });
+[elements.autoRevealAtSeconds, elements.autoRevealHoldSeconds].forEach((input) => {
+  input.addEventListener("input", () => clampNumber(input));
   input.addEventListener("change", () => {
-    if (input === elements.autoNextSeconds || input === elements.autoNextBpm) syncSpeed(input);
-    else {
-      clampNumber(input);
-      state.startedAt = performance.now();
-    }
+    clampNumber(input);
+    state.startedAt = performance.now();
   });
 });
 
@@ -1060,11 +1038,8 @@ document.querySelectorAll("[data-step-target]").forEach((button) => {
   button.addEventListener("click", () => {
     const input = document.querySelector(`#${button.dataset.stepTarget}`);
     input.value = String(Number(input.value) + Number(button.dataset.step));
-    if (input === elements.autoNextSeconds || input === elements.autoNextBpm) syncSpeed(input);
-    else {
-      clampNumber(input);
-      state.startedAt = performance.now();
-    }
+    clampNumber(input);
+    state.startedAt = performance.now();
   });
 });
 
