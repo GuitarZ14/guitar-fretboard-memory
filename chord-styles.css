@@ -364,15 +364,20 @@ button { color: inherit; cursor: pointer; }
   box-shadow: var(--shadow-clay-sm);
 }
 
-/* ===================== 左右分栏布局 ===================== */
-.layout-split {
+/* ===================== 三栏布局（oolimo 风格） ===================== */
+/* DOM 顺序：左控制 → 中主区 → 右和弦种类 → 理论（桌面理论置于主栏下方，移动端置于末尾） */
+.chords-layout {
   display: grid;
-  grid-template-columns: minmax(248px, 270px) minmax(0, 1fr);
   gap: 18px;
   align-items: start;
+  grid-template-columns: minmax(220px, 240px) minmax(0, 1fr) minmax(280px, 300px);
+  grid-template-areas:
+    "left main right"
+    "left theory right";
 }
 
-.sidebar-controls {
+.layout-left {
+  grid-area: left;
   display: grid;
   gap: 14px;
   align-self: start;
@@ -380,12 +385,56 @@ button { color: inherit; cursor: pointer; }
   top: 16px;
 }
 
-.main-column {
+.layout-main {
+  grid-area: main;
   display: flex;
   flex-direction: column;
   gap: 18px;
   min-width: 0;
 }
+
+.layout-right {
+  grid-area: right;
+  align-self: start;
+  position: sticky;
+  top: 16px;
+}
+
+.layout-theory { grid-area: theory; }
+
+/* 当前和弦 Hero 卡（置于主栏顶部） */
+.hero-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 20px 18px 18px;
+  overflow: hidden;
+  background: var(--surface);
+  border: var(--clay-border);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-clay);
+  transition: box-shadow .3s ease;
+}
+.hero-card:hover { box-shadow: var(--shadow-clay-lift); }
+.hero-card .hero-orbs { position: absolute; left: 0; right: 0; top: -28px; height: 180px; z-index: 0; pointer-events: none; }
+.hero-card .eyebrow { z-index: 1; }
+.hero-card .chord-name-card { z-index: 1; min-width: 0; padding: 22px 38px 18px; }
+.hero-card .chord-info { z-index: 1; }
+
+/* 右栏：和弦种类卡片（列表较长时内部滚动） */
+.chords-list-card {
+  max-height: calc(100vh - 32px);
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--text-3) transparent;
+}
+.chords-list-card::-webkit-scrollbar { width: 8px; }
+.chords-list-card::-webkit-scrollbar-thumb { background: rgba(120, 120, 140, 0.35); border-radius: var(--radius-pill); }
+.chords-list-card .selector-block:first-of-type { margin-top: 12px; }
+/* 右栏空间较窄，根音按钮稍紧凑（仍保持一行 12 个） */
+.layout-right .root-btn { padding: 8px 0; font-size: 11px; border-radius: 11px; }
 
 /* ===================== 控制卡片（侧栏） ===================== */
 .control-card {
@@ -950,46 +999,60 @@ footer > span { margin-right: 2px; }
   100% { transform: scale(2.4); opacity: 0; }
 }
 
-/* ===================== 响应式 ===================== */
-@media (max-width: 900px) {
-  .layout-split { grid-template-columns: 1fr; }
-  .sidebar-controls {
-    order: 2;
-    position: static;
-    grid-template-columns: 1fr 1fr;
-    gap: 10px;
+/* ===================== 响应式（三栏 → 单栏） ===================== */
+
+/* 平板 761–1040px：压缩左右栏，保持三栏并排 */
+@media (min-width: 761px) and (max-width: 1040px) {
+  .chords-layout {
+    grid-template-columns: minmax(196px, 224px) minmax(0, 1fr) minmax(196px, 224px);
+    gap: 12px;
   }
-  .sidebar-controls .control-card { height: 100%; }
+  .layout-left, .layout-right { position: static; }
+  .chords-list-card { max-height: none; overflow: visible; }
+  .root-buttons { grid-template-columns: repeat(6, 1fr); }
+  .voicing-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+  .voicing-card { flex-direction: row; align-items: center; justify-content: center; gap: 12px; padding: 10px 12px; }
 }
 
+/* 移动端 ≤760px：单栏，顺序 主区 → 和弦列表 → 控制 → 理论 */
 @media (max-width: 760px) {
   .app-shell { width: min(100% - 16px, 1180px); margin-top: 14px; padding-bottom: 14px; }
   .topbar { min-height: 46px; padding: 6px 12px; margin-bottom: 10px; }
   .brand-mark { width: 30px; height: 30px; font-size: 16px; }
   .brand strong { font-size: 12px; }
   .brand small { font-size: 8px; }
-  .tool-link { padding: 6px 10px; font-size: 9px; }
   .tool-nav.tabs { padding: 3px; margin-right: 0; }
   .tool-tab { padding: 5px 10px; font-size: 10px; }
 
-  .chord-hero { padding: 2px 0 10px; }
-  .hero-orbs { height: 190px; top: -10px; }
+  .chords-layout {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      "main"
+      "right"
+      "left"
+      "theory";
+    gap: 12px;
+  }
+  .layout-left, .layout-right { position: static; }
+  .chords-list-card { max-height: none; overflow: visible; }
+
+  .hero-card { padding: 14px 12px; }
+  .hero-orbs { height: 150px; top: -20px; }
   .orb-1 { width: 66px; height: 66px; }
   .orb-2 { width: 50px; height: 50px; margin-left: -25px; }
   .orb-3 { width: 60px; height: 60px; }
   .eyebrow { margin-bottom: 8px; padding: 5px 12px; font-size: 9px; }
 
-  .chord-name-card { min-width: 0; padding: 18px 26px 16px; border-radius: 22px; }
+  .chord-name-card { min-width: 0; padding: 16px 24px 14px; border-radius: 22px; }
   .chord-name-card span { font-size: 40px; }
   .chord-name-card small { font-size: 10px; margin-top: 7px; }
 
   .tone-chips .chip { min-width: 34px; height: 34px; font-size: 15px; border-radius: 11px; }
 
-  .layout-split { gap: 12px; }
-
   .selector-section,
   .fretboard-section,
-  .theory-section { padding: 12px 14px; border-radius: 18px; margin-inline: -8px; border-left: 0; border-right: 0; }
+  .theory-section,
+  .hero-card { padding: 12px 14px; border-radius: 18px; }
 
   .section-heading h1 { font-size: 17px; }
 
@@ -998,8 +1061,20 @@ footer > span { margin-right: 2px; }
 
   .type-btn { padding: 6px 10px; font-size: 10px; }
 
-  .sidebar-controls { grid-template-columns: 1fr 1fr; }
-  .sidebar-controls .control-card { padding: 12px 14px; }
+  /* 控制卡片在移动端堆叠为单列（仅两张） */
+  .layout-left .control-card { padding: 12px 14px; }
+  .layout-right .control-card { padding: 12px 14px; }
+
+  /* 右栏和弦列表：类型按钮横向滚动，避免溢出 */
+  .layout-right .type-group-btns {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    padding-bottom: 4px;
+    scrollbar-width: thin;
+    scrollbar-color: var(--text-3) transparent;
+    -webkit-overflow-scrolling: touch;
+  }
+  .layout-right .type-btn { flex: 0 0 auto; }
 
   .voicing-grid { grid-template-columns: 1fr; gap: 12px; }
   .voicing-card { flex-direction: row; align-items: center; justify-content: center; gap: 12px; padding: 10px 12px; }
@@ -1012,32 +1087,23 @@ footer > span { margin-right: 2px; }
   footer { margin-top: 12px; padding: 9px 0; font-size: 8px; }
 }
 
-@media (min-width: 761px) and (max-width: 1040px) {
-  .layout-split { grid-template-columns: minmax(220px, 240px) minmax(0, 1fr); gap: 12px; }
-  .sidebar-controls { gap: 10px; }
-  .sidebar-controls .control-card { padding: 12px 14px; }
-  .voicing-grid { grid-template-columns: 1fr; gap: 10px; }
-  .voicing-card { flex-direction: row; align-items: center; justify-content: center; gap: 12px; padding: 10px 12px; }
-}
-
-/* 矮视口 */
+/* 矮视口（≤760 宽且 ≤780 高）：进一步压缩 */
 @media (max-height: 780px) and (max-width: 760px) {
   .app-shell { margin-top: 8px; padding-bottom: 10px; }
   .topbar { min-height: 40px; padding: 4px 12px; margin-bottom: 6px; }
   .brand-mark { width: 26px; height: 26px; font-size: 14px; }
   .brand strong { font-size: 11px; }
-  .chord-hero { padding: 0 0 6px; }
   .chord-name-card { padding: 12px 20px 12px; }
   .chord-name-card span { font-size: 32px; }
   .chord-name-card small { font-size: 9px; margin-top: 5px; }
   .tone-chips { gap: 5px; }
   .tone-chips .chip { min-width: 28px; height: 28px; font-size: 12px; }
   .interval-chips .chip { padding: 2px 8px; font-size: 8px; }
-  .layout-split { gap: 8px; }
+  .chords-layout { gap: 8px; }
   .root-btn { padding: 5px 0; font-size: 10px; }
   .type-btn { padding: 4px 8px; font-size: 9px; }
-  .sidebar-controls { gap: 6px; }
-  .sidebar-controls .control-card { padding: 9px 11px; }
+  .layout-left .control-card,
+  .layout-right .control-card { padding: 9px 11px; }
   .voicing-grid { gap: 8px; }
   footer { margin-top: 8px; padding: 6px 0; font-size: 7px; }
 }

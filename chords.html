@@ -9,7 +9,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="chord-styles.css?v=3" />
+    <link rel="stylesheet" href="chord-styles.css?v=6" />
   </head>
   <body>
     <main class="app-shell">
@@ -27,27 +27,10 @@
         </nav>
       </header>
 
-      <!-- 当前和弦主视觉 -->
-      <section class="chord-hero reveal fade-in" aria-labelledby="chord-symbol">
-        <div class="hero-orbs" aria-hidden="true">
-          <span class="orb orb-1"></span>
-          <span class="orb orb-2"></span>
-          <span class="orb orb-3"></span>
-        </div>
-        <p class="eyebrow reveal fade-in stagger-1"><span class="pulse-dot"></span>当前和弦</p>
-        <div class="chord-name-card brutal-shadow-lg scale-in stagger-2" aria-live="polite">
-          <span id="chordSymbol">Cmaj7</span>
-          <small id="chordCn">大七和弦</small>
-        </div>
-        <div class="chord-info">
-          <div class="tone-chips" id="toneChips" aria-label="构成音"></div>
-          <div class="interval-chips" id="intervalChips" aria-label="音程"></div>
-        </div>
-      </section>
-
-      <div class="layout-split">
-        <!-- 设置侧栏 -->
-        <aside class="sidebar-controls reveal" aria-label="设置">
+      <!-- 三栏布局：左控制 → 中主区 → 右和弦种类（移动端重排为 主→右→左→理论） -->
+      <div class="chords-layout">
+        <!-- 左栏：调音与把位 + 显示选项 -->
+        <aside class="layout-left reveal" aria-label="设置">
           <article class="control-card brutal-shadow">
             <div class="control-title-row">
               <div class="control-icon" aria-hidden="true">♮</div>
@@ -113,23 +96,23 @@
           </article>
         </aside>
 
-        <!-- 主列 -->
-        <div class="main-column">
-          <!-- 和弦选择 -->
-          <section class="selector-section brutal-shadow reveal" aria-labelledby="selector-title">
-            <div class="section-heading">
-              <div>
-                <p class="section-kicker">和弦选择</p>
-                <h1 id="selector-title">根音 × 和弦类型</h1>
-              </div>
+        <!-- 主栏：当前和弦 + 指法图 -->
+        <div class="layout-main">
+          <!-- 当前和弦主视觉（移到主栏顶部） -->
+          <section class="hero-card reveal fade-in brutal-shadow-lg" aria-labelledby="chord-symbol">
+            <div class="hero-orbs" aria-hidden="true">
+              <span class="orb orb-1"></span>
+              <span class="orb orb-2"></span>
+              <span class="orb orb-3"></span>
             </div>
-            <div class="selector-block">
-              <span class="selector-label">根音</span>
-              <div class="root-buttons" id="rootButtons" role="group" aria-label="根音选择"></div>
+            <p class="eyebrow reveal fade-in stagger-1"><span class="pulse-dot"></span>当前和弦</p>
+            <div class="chord-name-card scale-in stagger-2" aria-live="polite">
+              <span id="chordSymbol">Cmaj7</span>
+              <small id="chordCn">大七和弦</small>
             </div>
-            <div class="selector-block">
-              <span class="selector-label">类型</span>
-              <div class="type-groups" id="typeGroups"></div>
+            <div class="chord-info">
+              <div class="tone-chips" id="toneChips" aria-label="构成音"></div>
+              <div class="interval-chips" id="intervalChips" aria-label="音程"></div>
             </div>
           </section>
 
@@ -157,28 +140,49 @@
             </div>
             <p class="fretboard-hint" id="diagramHint"><span class="hint-line"></span></p>
           </section>
-
-          <!-- 理论说明 -->
-          <section class="theory-section brutal-shadow reveal" aria-labelledby="theory-title">
-            <div class="section-heading">
-              <div>
-                <p class="section-kicker">构成与理论</p>
-                <h1 id="theory-title">和弦构成</h1>
-              </div>
-            </div>
-            <div class="theory-body">
-              <div class="theory-row">
-                <span class="theory-row-label">构成音</span>
-                <div class="tone-chips-lg" id="theoryTones"></div>
-              </div>
-              <div class="theory-row">
-                <span class="theory-row-label">音程</span>
-                <div class="interval-chips-lg" id="theoryIntervals"></div>
-              </div>
-              <p class="theory-desc" id="theoryDesc"></p>
-            </div>
-          </section>
         </div>
+
+        <!-- 右栏：和弦种类（根音 × 类型） -->
+        <aside class="layout-right reveal" aria-label="和弦种类">
+          <article class="control-card chords-list-card brutal-shadow">
+            <div class="control-title-row">
+              <div class="control-icon" aria-hidden="true">♪</div>
+              <div>
+                <h2>和弦种类</h2>
+                <p>根音 × 和弦类型</p>
+              </div>
+            </div>
+            <div class="selector-block">
+              <span class="selector-label">根音</span>
+              <div class="root-buttons" id="rootButtons" role="group" aria-label="根音选择"></div>
+            </div>
+            <div class="selector-block">
+              <span class="selector-label">类型</span>
+              <div class="type-groups" id="typeGroups"></div>
+            </div>
+          </article>
+        </aside>
+
+        <!-- 理论说明：桌面位于主栏下方，移动端置于末尾 -->
+        <section class="theory-section layout-theory brutal-shadow reveal" aria-labelledby="theory-title">
+          <div class="section-heading">
+            <div>
+              <p class="section-kicker">构成与理论</p>
+              <h1 id="theory-title">和弦构成</h1>
+            </div>
+          </div>
+          <div class="theory-body">
+            <div class="theory-row">
+              <span class="theory-row-label">构成音</span>
+              <div class="tone-chips-lg" id="theoryTones"></div>
+            </div>
+            <div class="theory-row">
+              <span class="theory-row-label">音程</span>
+              <div class="interval-chips-lg" id="theoryIntervals"></div>
+            </div>
+            <p class="theory-desc" id="theoryDesc"></p>
+          </div>
+        </section>
       </div>
 
       <footer class="reveal fade-in">
@@ -188,7 +192,7 @@
     </main>
 
     <script src="chord-engine.js?v=2"></script>
-    <script src="chord-app.js?v=2"></script>
+    <script src="chord-app.js?v=3"></script>
     <script>
       // 滚动触发入场动画：进入视口时添加 .in-view（播放一次）
       (function () {
