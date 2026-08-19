@@ -1,0 +1,212 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#fef3f2" />
+    <title>GUITAR 和弦速查</title>
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect x='1' y='1' width='30' height='30' rx='7' fill='%23fef3f2' stroke='%23cdd3e0' stroke-width='2'/%3E%3Ctext x='16' y='23' text-anchor='middle' font-family='Arial' font-weight='bold' font-size='20' fill='%23f5a69c'%3EG%3C/text%3E%3C/svg%3E" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="chord-styles.css?v=1" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <header class="topbar reveal fade-in">
+        <a class="brand" href="chords.html" aria-label="和弦速查首页">
+          <span class="brand-mark" aria-hidden="true">C</span>
+          <span>
+            <strong>GUITAR 和弦速查</strong>
+            <small>Guitar Z出品</small>
+          </span>
+        </a>
+        <nav class="tool-nav" aria-label="工具导航">
+          <a class="tool-link" href="index.html">指板练习</a>
+        </nav>
+      </header>
+
+      <!-- 当前和弦主视觉 -->
+      <section class="chord-hero reveal fade-in" aria-labelledby="chord-symbol">
+        <div class="hero-orbs" aria-hidden="true">
+          <span class="orb orb-1"></span>
+          <span class="orb orb-2"></span>
+          <span class="orb orb-3"></span>
+        </div>
+        <p class="eyebrow reveal fade-in stagger-1"><span class="pulse-dot"></span>当前和弦</p>
+        <div class="chord-name-card brutal-shadow-lg scale-in stagger-2" aria-live="polite">
+          <span id="chordSymbol">Cmaj7</span>
+          <small id="chordCn">大七和弦</small>
+        </div>
+        <div class="chord-info">
+          <div class="tone-chips" id="toneChips" aria-label="构成音"></div>
+          <div class="interval-chips" id="intervalChips" aria-label="音程"></div>
+        </div>
+      </section>
+
+      <div class="layout-split">
+        <!-- 设置侧栏 -->
+        <aside class="sidebar-controls reveal" aria-label="设置">
+          <article class="control-card brutal-shadow">
+            <div class="control-title-row">
+              <div class="control-icon" aria-hidden="true">♮</div>
+              <div>
+                <h2>调音与把位</h2>
+                <p>调音标准、左右手与变调夹</p>
+              </div>
+            </div>
+            <div class="setting-block">
+              <label class="setting-label" for="tuningSelect">调音标准</label>
+              <div class="clay-select-wrap">
+                <select id="tuningSelect" class="clay-select" aria-label="调音标准">
+                  <option value="standard">标准调弦 EADGBE</option>
+                  <option value="dropD">Drop D · DADGBE</option>
+                  <option value="dadgad">DADGAD</option>
+                  <option value="openG">Open G · DGDGBD</option>
+                  <option value="openD">Open D · DADF♯AD</option>
+                  <option value="eb">半音降调 · E♭A♭D♭G♭B♭E♭</option>
+                </select>
+              </div>
+              <p class="tuning-desc" id="tuningDesc">E A D G B E，最常用的标准定弦。</p>
+            </div>
+            <div class="setting-block">
+              <span class="setting-label">左右手</span>
+              <div class="segmented" id="handSwitch" role="group" aria-label="左右手配置">
+                <button type="button" data-hand="right" class="active" aria-pressed="true">右手</button>
+                <button type="button" data-hand="left" aria-pressed="false">左手</button>
+              </div>
+            </div>
+            <div class="setting-block">
+              <span class="setting-label" id="capoLabel">变调夹（0 品）</span>
+              <div class="number-field">
+                <button type="button" data-step-target="capoInput" data-step="-1" aria-label="减少变调夹品位">−</button>
+                <input id="capoInput" type="number" value="0" min="0" max="7" step="1" inputmode="numeric" aria-label="变调夹品位" />
+                <span>品</span>
+                <button type="button" data-step-target="capoInput" data-step="1" aria-label="增加变调夹品位">＋</button>
+              </div>
+            </div>
+          </article>
+
+          <article class="control-card brutal-shadow">
+            <div class="control-title-row">
+              <div class="control-icon" aria-hidden="true">♯♭</div>
+              <div>
+                <h2>显示选项</h2>
+                <p>升降记号与视图模式</p>
+              </div>
+            </div>
+            <div class="setting-block">
+              <span class="setting-label">升降记号</span>
+              <div class="segmented" id="accidentalSwitch" role="group" aria-label="升降记号">
+                <button type="button" data-acc="sharp" class="active" aria-pressed="true">升号 ♯</button>
+                <button type="button" data-acc="flat" aria-pressed="false">降号 ♭</button>
+              </div>
+            </div>
+            <div class="setting-block">
+              <span class="setting-label">视图</span>
+              <div class="segmented" id="viewSwitch" role="group" aria-label="视图模式">
+                <button type="button" data-view="voicing" class="active" aria-pressed="true">推荐指法</button>
+                <button type="button" data-view="fretboard" aria-pressed="false">全指板</button>
+              </div>
+            </div>
+          </article>
+        </aside>
+
+        <!-- 主列 -->
+        <div class="main-column">
+          <!-- 和弦选择 -->
+          <section class="selector-section brutal-shadow reveal" aria-labelledby="selector-title">
+            <div class="section-heading">
+              <div>
+                <p class="section-kicker">和弦选择</p>
+                <h1 id="selector-title">根音 × 和弦类型</h1>
+              </div>
+            </div>
+            <div class="selector-block">
+              <span class="selector-label">根音</span>
+              <div class="root-buttons" id="rootButtons" role="group" aria-label="根音选择"></div>
+            </div>
+            <div class="selector-block">
+              <span class="selector-label">类型</span>
+              <div class="type-groups" id="typeGroups"></div>
+            </div>
+          </section>
+
+          <!-- 指法图 -->
+          <section class="fretboard-section brutal-shadow reveal" aria-labelledby="diagram-title">
+            <div class="section-heading">
+              <div>
+                <p class="section-kicker" id="resultKicker">推荐指法</p>
+                <h1 id="diagram-title">Cmaj7 的按法</h1>
+              </div>
+              <div class="answer-status" id="voicingHint" aria-live="polite">
+                <span aria-hidden="true">●</span>
+                <span id="voicingHintText">自动生成</span>
+              </div>
+            </div>
+
+            <div id="voicingArea"></div>
+            <div id="fretboardArea" hidden></div>
+
+            <div class="legend" aria-hidden="true">
+              <span class="legend-root">根音</span>
+              <span>数字 = 手指</span>
+              <span>○ 空弦</span>
+              <span>× 闷弦</span>
+            </div>
+            <p class="fretboard-hint" id="diagramHint"><span class="hint-line"></span></p>
+          </section>
+
+          <!-- 理论说明 -->
+          <section class="theory-section brutal-shadow reveal" aria-labelledby="theory-title">
+            <div class="section-heading">
+              <div>
+                <p class="section-kicker">构成与理论</p>
+                <h1 id="theory-title">和弦构成</h1>
+              </div>
+            </div>
+            <div class="theory-body">
+              <div class="theory-row">
+                <span class="theory-row-label">构成音</span>
+                <div class="tone-chips-lg" id="theoryTones"></div>
+              </div>
+              <div class="theory-row">
+                <span class="theory-row-label">音程</span>
+                <div class="interval-chips-lg" id="theoryIntervals"></div>
+              </div>
+              <p class="theory-desc" id="theoryDesc"></p>
+            </div>
+          </section>
+        </div>
+      </div>
+
+      <footer class="reveal fade-in">
+        <span>提示</span>
+        指法为自动生成，优先低把位与清晰低音；同一和弦可切换不同把位变体。
+      </footer>
+    </main>
+
+    <script src="chord-engine.js?v=1"></script>
+    <script src="chord-app.js?v=1"></script>
+    <script>
+      // 滚动触发入场动画：进入视口时添加 .in-view（播放一次）
+      (function () {
+        var nodes = document.querySelectorAll('.reveal');
+        var reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        if (reduce || !('IntersectionObserver' in window)) {
+          nodes.forEach(function (el) { el.classList.add('in-view'); });
+          return;
+        }
+        var io = new IntersectionObserver(function (entries) {
+          entries.forEach(function (entry) {
+            if (entry.isIntersecting) {
+              entry.target.classList.add('in-view');
+              io.unobserve(entry.target);
+            }
+          });
+        }, { threshold: 0.12, rootMargin: '0px 0px -6% 0px' });
+        nodes.forEach(function (el) { io.observe(el); });
+      })();
+    </script>
+  </body>
+</html>

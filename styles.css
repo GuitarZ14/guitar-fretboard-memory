@@ -198,6 +198,28 @@ button { color: inherit; cursor: pointer; }
 }
 .round-count strong { font-family: var(--font); font-size: 24px; font-weight: 800; color: var(--text); }
 
+/* 顶栏工具导航（与其他工具页互链） */
+.tool-nav { display: flex; align-items: center; margin-right: 4px; }
+.tool-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  color: #2f5a6e;
+  background: var(--surface-blue);
+  border: var(--clay-border-sm);
+  border-radius: var(--radius-pill);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-decoration: none;
+  box-shadow: var(--shadow-clay-blue);
+  transition: transform .2s ease, box-shadow .2s ease, filter .2s ease;
+}
+.tool-link:hover { transform: translateY(-2px); filter: brightness(1.05); }
+.tool-link:active { transform: translateY(1px); }
+.tool-link:focus-visible { outline: 3px solid var(--purple-400); outline-offset: 2px; }
+
 /* 桌面大屏：放大标题栏，让顶部视觉更有分量，同时进一步压缩旧空白 */
 @media (min-width: 1041px) {
   .topbar { min-height: 72px; padding: 12px 22px; margin-bottom: 22px; }
@@ -205,6 +227,7 @@ button { color: inherit; cursor: pointer; }
   .brand strong { font-size: 17px; }
   .brand small { font-size: 10px; }
   .round-count strong { font-size: 32px; }
+  .tool-link { padding: 9px 16px; font-size: 12px; }
 }
 
 /* ===================== Hero ===================== */
@@ -966,6 +989,8 @@ kbd { padding: 3px 6px; color: var(--text-2); background: var(--surface); border
   .brand small { font-size: 8px; }
   .round-count strong { font-size: 18px; }
   .round-count span { display: none; }
+  .tool-nav { margin-right: 0; }
+  .tool-link { padding: 6px 10px; font-size: 9px; }
 
   /* Hero：压缩纵向间距，与小屏比例协调 */
   .hero { padding: 2px 0 6px; }
