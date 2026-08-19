@@ -93,6 +93,13 @@ async function box(page, sel) {
   check('顶栏存在「指板练习 / 和弦速查」双 Tab', topTabs.length === 2 && topTabs[0].text === '指板练习' && topTabs[1].text === '和弦速查');
   check('当前页「指板练习」Tab 高亮', topTabs[0].active && !topTabs[1].active && topTabs[0].href === 'index.html' && topTabs[1].href === 'chords.html');
 
+  // 双 Tab 在顶栏中保持居中（与和弦速查页统一）
+  const topbarBox = await box(page, '.topbar');
+  const tabsBox = await box(page, '.tool-nav.tabs');
+  const tabCenter = tabsBox.x + tabsBox.w / 2;
+  const topbarCenter = topbarBox.x + topbarBox.w / 2;
+  check('双 Tab 在顶栏中大致居中', Math.abs(tabCenter - topbarCenter) < 24, `tabCenter=${tabCenter.toFixed(1)} topbarCenter=${topbarCenter.toFixed(1)}`);
+
   // 四张控制卡片都在侧栏内
   const cardsInSidebar = await page.$$eval('.sidebar-controls .control-card', (els) => els.map((e) => e.id));
   check('侧栏含 4 张控制卡片', cardsInSidebar.length === 4, cardsInSidebar.join(','));
