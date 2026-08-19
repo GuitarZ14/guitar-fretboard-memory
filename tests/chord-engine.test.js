@@ -175,6 +175,23 @@ check("和弦符号生成", () => {
   assert.strictEqual(chordSymbol(2, CHORD_TYPE_MAP["6/9"], "sharp"), "D6/9");
 });
 
+check("组成音标签统一为数字音级（maj7→7，m3→b3）", () => {
+  assert.deepStrictEqual(CHORD_TYPE_MAP.maj7.labels, ["1", "3", "5", "7"]);
+  assert.deepStrictEqual(CHORD_TYPE_MAP.maj9.labels, ["1", "3", "5", "7", "9"]);
+  assert.deepStrictEqual(CHORD_TYPE_MAP.maj13.labels, ["1", "3", "5", "7", "9", "13"]);
+  assert.deepStrictEqual(CHORD_TYPE_MAP.minor.labels, ["1", "b3", "5"]);
+  assert.deepStrictEqual(CHORD_TYPE_MAP.m7.labels, ["1", "b3", "5", "b7"]);
+  assert.deepStrictEqual(CHORD_TYPE_MAP["m(maj7)"].labels, ["1", "b3", "5", "7"]);
+  // 验证没有遗留 maj7 / m3 符号混用
+  const badLabels = [];
+  Object.values(CHORD_TYPE_MAP).forEach((t) => {
+    t.labels.forEach((l) => {
+      if (l === "maj7" || l === "m3") badLabels.push(`${t.id}:${l}`);
+    });
+  });
+  assert.deepStrictEqual(badLabels, []);
+});
+
 check("全指板位置覆盖与根音标记", () => {
   const pos = fretboardPositions(0, CHORD_TYPE_MAP.major, standard, { frets: 12 });
   const roots = pos.filter((p) => p.isRoot);

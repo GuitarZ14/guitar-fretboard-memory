@@ -51,7 +51,7 @@ const CHORD_TYPES = [
   },
   {
     id: "minor", group: "triad", suffix: "m", cn: "小三和弦",
-    intervals: [0, 3, 7], labels: ["1", "m3", "5"],
+    intervals: [0, 3, 7], labels: ["1", "b3", "5"],
     aliases: ["-", "MI", "min"],
     desc: "在三和弦基础上把三度音降低半音，音色柔和、忧郁、安静，常用于抒情与伤感色彩的段落。",
   },
@@ -63,7 +63,7 @@ const CHORD_TYPES = [
   },
   {
     id: "dim", group: "triad", suffix: "dim", cn: "减三和弦",
-    intervals: [0, 3, 6], labels: ["1", "m3", "b5"],
+    intervals: [0, 3, 6], labels: ["1", "b3", "b5"],
     aliases: ["°"],
     desc: "三度与五度同时降低，充满紧张、阴郁与不协和感，常作为经过性与过渡性和弦使用。",
   },
@@ -82,7 +82,7 @@ const CHORD_TYPES = [
   /* === Four tone（四音和弦）=== */
   {
     id: "maj7", group: "fourth", suffix: "maj7", cn: "大七和弦",
-    intervals: [0, 4, 7, 11], labels: ["1", "3", "5", "maj7"],
+    intervals: [0, 4, 7, 11], labels: ["1", "3", "5", "7"],
     aliases: ["Δ7", "j7", "M7", "MA7"],
     desc: "大调三和弦叠加大七度，色彩明亮又略带梦幻，是爵士、Funk 与现代 R&B 的标志性音响。",
   },
@@ -94,19 +94,19 @@ const CHORD_TYPES = [
   },
   {
     id: "m7", group: "fourth", suffix: "m7", cn: "小七和弦",
-    intervals: [0, 3, 7, 10], labels: ["1", "m3", "5", "b7"],
+    intervals: [0, 3, 7, 10], labels: ["1", "b3", "5", "b7"],
     aliases: ["-7", "MI7", "min7"],
     desc: "小调三和弦叠加小七度，柔和松弛、没有压迫感，常用于 ii–V–I 进行与爵士 Funk。",
   },
   {
     id: "m7b5", group: "fourth", suffix: "m7b5", cn: "半减七和弦",
-    intervals: [0, 3, 6, 10], labels: ["1", "m3", "b5", "b7"],
+    intervals: [0, 3, 6, 10], labels: ["1", "b3", "b5", "b7"],
     aliases: ["ø", "∅"],
     desc: "在小七和弦基础下降五度，暗淡而紧张，是自然小调 ii 级与爵士 ii–V–I 中的常客。",
   },
   {
     id: "dim7", group: "fourth", suffix: "dim7", cn: "减七和弦",
-    intervals: [0, 3, 6, 9], labels: ["1", "m3", "b5", "bb7"],
+    intervals: [0, 3, 6, 9], labels: ["1", "b3", "b5", "bb7"],
     aliases: ["°7"],
     desc: "四个音相距都是小三度，结构完全对称，紧张感极强，常用来做经过连接或转向离调和弦。",
   },
@@ -117,7 +117,7 @@ const CHORD_TYPES = [
   },
   {
     id: "m6", group: "fourth", suffix: "m6", cn: "小六和弦",
-    intervals: [0, 3, 7, 9], labels: ["1", "m3", "5", "6"],
+    intervals: [0, 3, 7, 9], labels: ["1", "b3", "5", "6"],
     aliases: ["-6"],
     desc: "小调三和弦叠加大六度，温柔中带一丝紧张，常见于爵士与拉丁风格的伴奏。",
   },
@@ -137,13 +137,13 @@ const CHORD_TYPES = [
   },
   {
     id: "maj9", group: "extended", suffix: "maj9", cn: "大九和弦",
-    intervals: [0, 4, 7, 11, 14], labels: ["1", "3", "5", "maj7", "9"],
+    intervals: [0, 4, 7, 11, 14], labels: ["1", "3", "5", "7", "9"],
     aliases: ["Δ9", "j9", "M9", "MA9"],
     desc: "大七和弦叠加九度音，梦幻而华丽，是现代爵士与 Neo-Soul 的高频音色。",
   },
   {
     id: "m9", group: "extended", suffix: "m9", cn: "小九和弦",
-    intervals: [0, 3, 7, 10, 14], labels: ["1", "m3", "5", "b7", "9"],
+    intervals: [0, 3, 7, 10, 14], labels: ["1", "b3", "5", "b7", "9"],
     aliases: ["-9"],
     desc: "小七和弦叠加九度音，柔和而富有爵士质感，常在小调 ii–V–I 中使用。",
   },
@@ -154,7 +154,7 @@ const CHORD_TYPES = [
   },
   {
     id: "m11", group: "extended", suffix: "m11", cn: "小十一和弦",
-    intervals: [0, 3, 7, 10, 14, 17], labels: ["1", "m3", "5", "b7", "9", "11"],
+    intervals: [0, 3, 7, 10, 14, 17], labels: ["1", "b3", "5", "b7", "9", "11"],
     desc: "小九和弦叠加十一度，气质内敛而富有延展性，是现代爵士与融合乐的重要色彩。",
   },
   {
@@ -164,7 +164,7 @@ const CHORD_TYPES = [
   },
   {
     id: "maj13", group: "extended", suffix: "maj13", cn: "大十三和弦",
-    intervals: [0, 4, 7, 11, 14, 21], labels: ["1", "3", "5", "maj7", "9", "13"],
+    intervals: [0, 4, 7, 11, 14, 21], labels: ["1", "3", "5", "7", "9", "13"],
     aliases: ["Δ13", "j13", "M13", "MA13"],
     desc: "大九和弦叠加十三度（大六度），色彩梦幻而开阔，是现代爵士里少而精的奢华色彩。",
   },
@@ -220,22 +220,22 @@ const CHORD_TYPES = [
   /* === m(maj) —— 小大和弦 === */
   {
     id: "m(maj7)", group: "mmaj", suffix: "m(maj7)", cn: "小大和弦",
-    intervals: [0, 3, 7, 11], labels: ["1", "m3", "5", "maj7"],
+    intervals: [0, 3, 7, 11], labels: ["1", "b3", "5", "7"],
     desc: "小调三和弦叠加大七度，柔和却略带渴望，是爵士里富于色彩的人声式和弦。",
   },
   {
     id: "m(maj9)", group: "mmaj", suffix: "m(maj9)", cn: "小大九和弦",
-    intervals: [0, 3, 7, 11, 14], labels: ["1", "m3", "5", "maj7", "9"],
+    intervals: [0, 3, 7, 11, 14], labels: ["1", "b3", "5", "7", "9"],
     desc: "小大和弦叠加九度音，温柔而梦幻，是 R&B 与 Neo-Soul 里的进阶色彩。",
   },
   {
     id: "m(maj11)", group: "mmaj", suffix: "m(maj11)", cn: "小大十一和弦",
-    intervals: [0, 3, 7, 11, 14, 17], labels: ["1", "m3", "5", "maj7", "9", "11"],
+    intervals: [0, 3, 7, 11, 14, 17], labels: ["1", "b3", "5", "7", "9", "11"],
     desc: "在小大九基础上叠加纯十一度，气质更开阔延展，是现代爵士与电影配乐里少而精的色彩。",
   },
   {
     id: "m(maj13)", group: "mmaj", suffix: "m(maj13)", cn: "小大十三和弦",
-    intervals: [0, 3, 7, 11, 14, 21], labels: ["1", "m3", "5", "maj7", "9", "13"],
+    intervals: [0, 3, 7, 11, 14, 21], labels: ["1", "b3", "5", "7", "9", "13"],
     desc: "小大九叠加大六度（13），是小调与爵士交融的最高形态。",
   },
 
@@ -249,7 +249,7 @@ const CHORD_TYPES = [
   /* === Add / Sus === */
   {
     id: "m(add9)", group: "addsus", suffix: "m(add9)", cn: "小加九和弦",
-    intervals: [0, 3, 7, 14], labels: ["1", "m3", "5", "9"],
+    intervals: [0, 3, 7, 14], labels: ["1", "b3", "5", "9"],
     desc: "小调三和弦直接叠加九度音，不含七度，音色柔和且带闪烁感。",
   },
   {
