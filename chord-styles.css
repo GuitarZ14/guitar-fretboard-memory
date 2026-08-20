@@ -813,18 +813,40 @@ button { color: inherit; cursor: pointer; }
 .diagram-open { font-family: var(--font); font-size: 10px; font-weight: 800; fill: var(--text-2); }
 .diagram-mute { font-family: var(--font); font-size: 10px; font-weight: 800; fill: var(--text-3); }
 
-/* 全指板图 */
-.fretboard-wrap-diagram {
+/* 全指板图（横向滚动 + 分段动态加载） */
+.fretboard-scroll {
   margin-top: 4px;
+  display: flex;
+  align-items: stretch;
   overflow-x: auto;
   padding: 4px 4px 8px;
   scrollbar-color: var(--text-3) transparent;
   scrollbar-width: thin;
   -webkit-overflow-scrolling: touch;
+  scroll-behavior: smooth;
 }
-.fretboard-wrap-diagram::-webkit-scrollbar { height: 10px; }
-.fretboard-wrap-diagram::-webkit-scrollbar-thumb { background: rgba(120, 120, 140, 0.4); border-radius: var(--radius-pill); }
-.full-fretboard svg { display: block; margin: 0 auto; }
+.fretboard-part { flex: 0 0 auto; }
+.fretboard-part svg { display: block; }
+.fretboard-more {
+  flex: 0 0 auto;
+  min-width: 150px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 0 18px;
+  color: var(--text-3);
+  font-size: 11px;
+  font-weight: 700;
+  text-align: center;
+  border-left: 1px dashed rgba(120, 120, 140, 0.45);
+}
+.fretboard-more-arrow { font-size: 13px; }
+.fretboard-more-text { letter-spacing: 0.5px; }
+.fretboard-scroll::-webkit-scrollbar { height: 10px; }
+.fretboard-scroll::-webkit-scrollbar-thumb { background: rgba(120, 120, 140, 0.4); border-radius: var(--radius-pill); }
+.full-fretboard svg { display: block; }
 
 /* 图例 */
 .legend {

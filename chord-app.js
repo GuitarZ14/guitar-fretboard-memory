@@ -265,32 +265,40 @@ function buildVoicingSVG(v, type, tuning) {
   return parts.join("\n");
 }
 
-/* ---------------- 全指板横向图 SVG ---------------- */
-function buildFullFretboardSVG(type, tuning) {
-  const maxFret = 24;
-  const pad = { t: 26, r: 16, b: 20, l: 34 };
-  const colW = 34;
-  const rowH = 30;
-  const order = state.handed === "left" ? [5, 4, 3, 2, 1, 0] : [0, 1, 2, 3, 4, 5];
-  const w = pad.l + (maxFret + 1) * colW + pad.r;
+/* ---------------- 全指板横向图 SVG（可分段渲染） ----------------
+   opts: { start=0, end=24, leftPad=34, showNames=true }
+   - 仅渲染 [start, end] 品，便于「首屏 0–12、右滑动态加载 13–24」
+   - 各段共用同一 colW/rowH，拼接处无间隙
+*/
+function buildFullFretboardSVG(type, tuning, opts = {}) {
+  const start = opts.start ?? 0;
+  const end = opts.end ?? 24;
+  const leftPad = opts.leftPad ?? 34;
+  const showNames = opts.showNames ?? true;
+  const pad = { t: 28, r: end === 24 ? 16 : 0, b: 18, l: leftPad };
+  const colW = 44;          // 放大：原 34
+  const rowH = 38;          // 放大：原 30
+  const rightEdge = leftPad + (end - start) * colW; // 最后一品品丝 x（琴弦止于此处）
+  const w = rightEdge + pad.r;
   const h = pad.t + 6 * rowH + pad.b;
 
-  const positions = fretboardPositions(state.root, type, tuning.pitches, {
-    frets: maxFret,
-  });
+  const order = state.handed === "left" ? [5, 4, 3, 2, 1, 0] : [0, 1, 2, 3, 4, 5];
+  const positions = fretboardPositions(state.root, type, tuning.pitches, { frets: end })
+    .filter((p) => p.fret >= start && p.fret <= end);
 
   const parts = [];
-  parts.push(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}" role="img" aria-label="全指板和弦音位置" class="full-fretboard">`);
+  parts.push(`<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" role="img" aria-label="全指板和弦音位置（${start}–${end} 品）" class="full-fretboard">`);
 
-  // 品位数字
-  for (let f = 1; f <= maxFret; f += 1) {
-    const x = pad.l + f * colW + colW / 2;
-    parts.push(`<text class="diagram-fretnum" x="${x}" y="${pad.t - 8}" text-anchor="middle">${f}</text>`);
+  // 品位数字（上弦枕 0 品不标）
+  for (let f = start; f <= end; f += 1) {
+    if (f === 0) continue;
+    const x = leftPad + (f - start) * colW + colW / 2;
+    parts.push(`<text class="diagram-fretnum" x="${x}" y="${pad.t - 9}" text-anchor="middle">${f}</text>`);
   }
 
   // 品丝竖线：比琴弦粗，以突出指板分隔
-  for (let f = 0; f <= maxFret; f += 1) {
-    const x = pad.l + f * colW;
+  for (let f = start; f <= end; f += 1) {
+    const x = leftPad + (f - start) * colW;
     const isNut = f === 0;
     parts.push(
       `<line x1="${x}" y1="${pad.t}" x2="${x}" y2="${pad.t + 6 * rowH}" stroke="${isNut ? DIAGRAM_COLORS.nut : DIAGRAM_COLORS.line}" stroke-width="${isNut ? 8 : 7}"/>`
@@ -301,30 +309,34 @@ function buildFullFretboardSVG(type, tuning) {
   order.forEach((si, row) => {
     const y = pad.t + row * rowH + rowH / 2;
     const sw = stringWidth(si, 2, 6);
-    parts.push(`<line x1="${pad.l}" y1="${y}" x2="${pad.l + maxFret * colW}" y2="${y}" stroke="${DIAGRAM_COLORS.line}" stroke-width="${sw}"/>`);
-    parts.push(`<text class="diagram-stringname" x="${pad.l - 9}" y="${y + 3}" text-anchor="end">${noteName(tuning.pitches[si], state.accidental)}</text>`);
+    parts.push(`<line x1="${leftPad}" y1="${y}" x2="${rightEdge}" y2="${y}" stroke="${DIAGRAM_COLORS.line}" stroke-width="${sw}"/>`);
+    if (showNames) {
+      parts.push(`<text class="diagram-stringname" x="${leftPad - 9}" y="${y + 3}" text-anchor="end">${noteName(tuning.pitches[si], state.accidental)}</text>`);
+    }
   });
 
   // 品记
   const singleInlays = [3, 5, 7, 9, 15, 17, 19, 21];
   singleInlays.forEach((f) => {
-    const x = pad.l + f * colW + colW / 2;
-    parts.push(`<circle cx="${x}" cy="${pad.t + 3 * rowH}" r="5" fill="rgba(120,120,140,0.35)"/>`);
+    if (f < start || f > end) return;
+    const x = leftPad + (f - start) * colW + colW / 2;
+    parts.push(`<circle cx="${x}" cy="${pad.t + 3 * rowH}" r="6" fill="rgba(120,120,140,0.35)"/>`);
   });
   [12, 24].forEach((f) => {
-    const x = pad.l + f * colW + colW / 2;
-    parts.push(`<circle cx="${x}" cy="${pad.t + 2.5 * rowH}" r="5" fill="rgba(120,120,140,0.35)"/>`);
-    parts.push(`<circle cx="${x}" cy="${pad.t + 4.5 * rowH}" r="5" fill="rgba(120,120,140,0.35)"/>`);
+    if (f < start || f > end) return;
+    const x = leftPad + (f - start) * colW + colW / 2;
+    parts.push(`<circle cx="${x}" cy="${pad.t + 2.5 * rowH}" r="6" fill="rgba(120,120,140,0.35)"/>`);
+    parts.push(`<circle cx="${x}" cy="${pad.t + 4.5 * rowH}" r="6" fill="rgba(120,120,140,0.35)"/>`);
   });
 
   // 和弦音位置
   positions.forEach((p) => {
-    const x = pad.l + p.fret * colW + colW / 2;
+    const x = leftPad + (p.fret - start) * colW + colW / 2;
     const row = order.indexOf(p.si);
     const y = pad.t + row * rowH + rowH / 2;
     const fill = p.isRoot ? DIAGRAM_COLORS.root : DIAGRAM_COLORS.tone;
     parts.push(
-      `<circle cx="${x}" cy="${y}" r="${p.isRoot ? 10 : 8}" fill="${fill}" stroke="rgba(255,255,255,0.9)" stroke-width="2"/>`
+      `<circle cx="${x}" cy="${y}" r="${p.isRoot ? 13 : 10}" fill="${fill}" stroke="rgba(255,255,255,0.9)" stroke-width="2"/>`
     );
     if (p.isRoot) {
       parts.push(`<text class="diagram-root" x="${x}" y="${y + 1}" text-anchor="middle" dominant-baseline="central">R</text>`);
@@ -333,6 +345,21 @@ function buildFullFretboardSVG(type, tuning) {
 
   parts.push("</svg>");
   return parts.join("\n");
+}
+
+/* 右滑到底时动态加载 13–24 品（方案 B：双 SVG 分页） */
+function loadHighFretboard(type, tuning) {
+  const scroll = document.getElementById("fretboardScroll");
+  if (!scroll || document.getElementById("fretboardPartHigh")) return;
+  const more = document.getElementById("fretboardMore");
+  const part = document.createElement("div");
+  part.className = "fretboard-part";
+  part.id = "fretboardPartHigh";
+  part.innerHTML = buildFullFretboardSVG(type, tuning, { start: 13, end: 24, leftPad: 0, showNames: false });
+  if (more) scroll.insertBefore(part, more);
+  else scroll.appendChild(part);
+  if (more) more.remove();
+  scroll.style.maxWidth = "none";
 }
 
 /* ---------------- 渲染 ---------------- */
@@ -427,13 +454,34 @@ function renderVoicings() {
     if (legend) legend.hidden = true;
 
     elements.fretboardArea.innerHTML = `
-      <div class="fretboard-wrap-diagram">
-        ${buildFullFretboardSVG(type, tuning)}
+      <div class="fretboard-scroll" id="fretboardScroll">
+        <div class="fretboard-part" id="fretboardPartLow">${buildFullFretboardSVG(type, tuning, { start: 0, end: 12, leftPad: 34, showNames: true })}</div>
+        <div class="fretboard-more" id="fretboardMore">
+          <span class="fretboard-more-arrow">向右滑动 →</span>
+          <span class="fretboard-more-text">加载 13–24 品</span>
+        </div>
       </div>`;
+
+    // 默认仅展示 0–12 品；右滑到尽头时动态加载 13–24 品
+    const scroll = document.getElementById("fretboardScroll");
+    const lowPart = document.getElementById("fretboardPartLow");
+    if (scroll && lowPart) {
+      scroll.style.maxWidth = lowPart.offsetWidth + "px";
+      let highLoaded = false;
+      scroll.addEventListener("scroll", () => {
+        if (highLoaded) return;
+        const max = scroll.scrollWidth - scroll.clientWidth;
+        if (max > 0 && scroll.scrollLeft >= max - 60) {
+          highLoaded = true;
+          loadHighFretboard(type, tuning);
+        }
+      });
+    }
+
     elements.voicingHint.classList.add("visible");
-    elements.voicingHintText.textContent = "0–24 品";
+    elements.voicingHintText.textContent = "0–12 品（右滑加载 13–24）";
     elements.diagramHint.innerHTML =
-      `<span class="hint-line"></span> 深蓝为根音，桃色为和弦构成音，可横向滚动查看。`;
+      `<span class="hint-line"></span> 深蓝为根音，桃色为和弦构成音，可横向滚动查看更高把位。`;
   }
 }
 
