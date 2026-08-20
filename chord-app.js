@@ -240,11 +240,20 @@ function buildVoicingSVG(v, type, tuning) {
     }
   });
 
-  // 弦名（底部）
+  // 弦名（底部）：按实际发声音高显示（闷弦 ×、空弦音名、按品音名）
   order.forEach((si, col) => {
     const x = pad.l + col * colW + colW / 2;
+    const f = frets[si];
+    let label;
+    if (f === -1) {
+      label = "×";
+    } else if (f === 0) {
+      label = noteName(tuning.pitches[si], state.accidental);
+    } else {
+      label = noteName(tuning.pitches[si] + f, state.accidental);
+    }
     parts.push(
-      `<text class="diagram-stringname" x="${x}" y="${pad.t + rows * rowH + 11}" text-anchor="middle">${noteName(tuning.pitches[si], state.accidental)}</text>`
+      `<text class="diagram-stringname" x="${x}" y="${pad.t + rows * rowH + 11}" text-anchor="middle">${label}</text>`
     );
   });
 
