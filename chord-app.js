@@ -298,7 +298,8 @@ function buildFullFretboardSVG(type, tuning, opts = {}) {
   const w = rightEdge + pad.r;
   const h = pad.t + 6 * rowH + pad.b;
 
-  const order = state.handed === "left" ? [5, 4, 3, 2, 1, 0] : [0, 1, 2, 3, 4, 5];
+  // 弦序：固定 1弦（高音 e）在上、6弦（低音 E）在下，不随 handed 上下镜像
+  const order = [0, 1, 2, 3, 4, 5];
   const positions = fretboardPositions(state.root, type, tuning.pitches, { frets: end })
     .filter((p) => p.fret >= start && p.fret <= end);
 
