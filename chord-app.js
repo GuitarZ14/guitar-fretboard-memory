@@ -14,6 +14,7 @@ const DEFAULT_STATE = {
   handed: "right",
   accidental: "sharp",
   view: "voicing",  // voicing | fretboard
+  fbLabelMode: "degree", // degree | note
 };
 
 function loadState() {
@@ -27,6 +28,7 @@ function loadState() {
         handed: saved.handed === "left" ? "left" : "right",
         accidental: saved.accidental === "flat" ? "flat" : "sharp",
         view: saved.view === "fretboard" ? "fretboard" : "voicing",
+        fbLabelMode: saved.fbLabelMode === "note" ? "note" : "degree",
       };
     }
   } catch {
@@ -71,6 +73,20 @@ function saveState() {
 
 function currentType() {
   return CHORD_TYPE_MAP[state.typeId];
+}
+
+function mod12(n) {
+  return ((n % 12) + 12) % 12;
+}
+
+/* 根据和弦类型与位置，返回级数标签（如 R / 3 / b7 / 9） */
+function degreeLabelForPosition(type, tuning, p) {
+  const semi = mod12(tuning.pitches[p.si] + p.fret);
+  const intervalSemi = mod12(semi - state.root);
+  const idx = type.intervals.findIndex((iv) => mod12(iv) === intervalSemi);
+  if (idx < 0) return "";
+  const raw = type.labels[idx];
+  return raw === "1" ? "R" : raw;
 }
 
 /* 旧的 getVoicings 已替换为 extendedVoicings */
@@ -329,7 +345,7 @@ function buildFullFretboardSVG(type, tuning, opts = {}) {
     parts.push(`<circle cx="${x}" cy="${pad.t + 4.5 * rowH}" r="6" fill="rgba(120,120,140,0.35)"/>`);
   });
 
-  // 和弦音位置
+  // 和弦音位置 + 标记文字（级数 / 音名）
   positions.forEach((p) => {
     const x = leftPad + (p.fret - start) * colW + colW / 2;
     const row = order.indexOf(p.si);
@@ -338,8 +354,13 @@ function buildFullFretboardSVG(type, tuning, opts = {}) {
     parts.push(
       `<circle cx="${x}" cy="${y}" r="${p.isRoot ? 13 : 10}" fill="${fill}" stroke="rgba(255,255,255,0.9)" stroke-width="2"/>`
     );
-    if (p.isRoot) {
-      parts.push(`<text class="diagram-root" x="${x}" y="${y + 1}" text-anchor="middle" dominant-baseline="central">R</text>`);
+
+    const degLabel = degreeLabelForPosition(type, tuning, p);
+    const noteLabel = noteName(mod12(tuning.pitches[p.si] + p.fret), state.accidental);
+    const activeLabel = state.fbLabelMode === "note" ? noteLabel : degLabel;
+    if (activeLabel) {
+      const cls = p.isRoot ? "diagram-root" : "diagram-fb-label";
+      parts.push(`<text class="${cls}" x="${x}" y="${y + 1}" text-anchor="middle" dominant-baseline="central" data-fb-deg="${degLabel}" data-fb-note="${noteLabel}">${activeLabel}</text>`);
     }
   });
 
@@ -453,12 +474,24 @@ function renderVoicings() {
     const legend = document.querySelector(".legend");
     if (legend) legend.hidden = true;
 
+    const degreeActive = state.fbLabelMode === "degree" ? "active" : "";
+    const noteActive = state.fbLabelMode === "note" ? "active" : "";
+    const degreePressed = state.fbLabelMode === "degree" ? "true" : "false";
+    const notePressed = state.fbLabelMode === "note" ? "true" : "false";
+
     elements.fretboardArea.innerHTML = `
       <div class="fretboard-scroll" id="fretboardScroll">
         <div class="fretboard-part" id="fretboardPartLow">${buildFullFretboardSVG(type, tuning, { start: 0, end: 12, leftPad: 34, showNames: true })}</div>
         <div class="fretboard-more" id="fretboardMore">
           <span class="fretboard-more-arrow">向右滑动 →</span>
           <span class="fretboard-more-text">加载 13–24 品</span>
+        </div>
+      </div>
+      <div class="fretboard-label-switch">
+        <span class="fretboard-label-title">指板标记</span>
+        <div class="segmented" id="fbLabelSwitch">
+          <button type="button" data-fb-label="degree" class="${degreeActive}" aria-pressed="${degreePressed}">级数</button>
+          <button type="button" data-fb-label="note" class="${noteActive}" aria-pressed="${notePressed}">音名</button>
         </div>
       </div>`;
 
@@ -556,6 +589,34 @@ elements.viewSwitch.addEventListener("click", (e) => {
   if (!btn) return;
   state.view = btn.dataset.view;
   renderAll();
+});
+
+/* 切换指板标记显示模式（级数 / 音名），仅更新 SVG 文字，不重绘指板，保留滚动位置与已加载高把位 */
+function updateFretboardLabelMode(mode) {
+  if (mode !== "degree" && mode !== "note") return;
+  state.fbLabelMode = mode;
+
+  const switchEl = document.getElementById("fbLabelSwitch");
+  if (switchEl) {
+    switchEl.querySelectorAll("button[data-fb-label]").forEach((btn) => {
+      const active = btn.dataset.fbLabel === mode;
+      btn.classList.toggle("active", active);
+      btn.setAttribute("aria-pressed", String(active));
+    });
+  }
+
+  document.querySelectorAll(".full-fretboard text[data-fb-deg]").forEach((el) => {
+    el.textContent = mode === "note" ? el.dataset.fbNote : el.dataset.fbDeg;
+  });
+
+  saveState();
+}
+
+// 指板标记切换（级数 / 音名）—— 事件委托
+elements.fretboardArea.addEventListener("click", (e) => {
+  const btn = e.target.closest("button[data-fb-label]");
+  if (!btn) return;
+  updateFretboardLabelMode(btn.dataset.fbLabel);
 });
 
 /* ---------------- 初始化 ---------------- */

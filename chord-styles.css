@@ -848,6 +848,18 @@ button { color: inherit; cursor: pointer; }
 .fretboard-scroll::-webkit-scrollbar-thumb { background: rgba(120, 120, 140, 0.4); border-radius: var(--radius-pill); }
 .full-fretboard svg { display: block; }
 
+/* 指板标记切换（级数 / 音名） */
+.fretboard-label-switch {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 10px;
+}
+.fretboard-label-title { font-size: 11px; font-weight: 700; color: var(--text-3); }
+.fretboard-label-switch .segmented button { padding: 5px 12px; }
+.diagram-fb-label { font-family: var(--font); font-size: 10px; font-weight: 800; fill: var(--tone-ink); }
+
 /* 图例 */
 .legend {
   display: flex;
