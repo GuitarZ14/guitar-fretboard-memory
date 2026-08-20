@@ -176,7 +176,7 @@ function buildVoicingSVG(v, type, tuning) {
     const y = pad.t + r * rowH;
     const isTop = r === 0;
     parts.push(
-      `<line x1="${pad.l + colW / 2}" y1="${y}" x2="${pad.l + colW * 5.5}" y2="${y}" stroke="${isTop ? DIAGRAM_COLORS.nut : DIAGRAM_COLORS.line}" stroke-width="${isTop ? 6 : 5}"/>`
+      `<line x1="${pad.l}" y1="${y}" x2="${pad.l + colW * 6}" y2="${y}" stroke="${isTop ? DIAGRAM_COLORS.nut : DIAGRAM_COLORS.line}" stroke-width="${isTop ? 4 : 1.4}"/>`
     );
   }
 
@@ -187,12 +187,11 @@ function buildVoicingSVG(v, type, tuning) {
     parts.push(`<text class="diagram-fretnum" x="${pad.l - 7}" y="${cy + 3}" text-anchor="end">${label}</text>`);
   }
 
-  // 竖线（琴弦）：粗细随物理弦号梯度（1弦最细 → 6弦最粗）
+  // 竖线（琴弦）
   order.forEach((si, col) => {
     const x = pad.l + col * colW + colW / 2;
-    const sw = stringWidth(si, 1.5, 4);
     parts.push(
-      `<line x1="${x}" y1="${pad.t}" x2="${x}" y2="${pad.t + rows * rowH}" stroke="${DIAGRAM_COLORS.line}" stroke-width="${sw}"/>`
+      `<line x1="${x}" y1="${pad.t}" x2="${x}" y2="${pad.t + rows * rowH}" stroke="${DIAGRAM_COLORS.line}" stroke-width="1.4"/>`
     );
   });
 
