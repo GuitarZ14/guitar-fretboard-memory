@@ -166,21 +166,20 @@ function buildVoicingSVG(v, type, tuning) {
   const parts = [];
   parts.push(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}" role="img" aria-label="和弦指法图">`);
 
-  // 品位数字（每根横线左侧）
+  // 横线（品丝）：最顶部横条始终为粗线（上弦枕），所有和弦图统一风格
   for (let r = 0; r <= rows; r += 1) {
-    const label = start + r;
     const y = pad.t + r * rowH;
-    if (label === 0) continue; // nut 不标
-    parts.push(`<text class="diagram-fretnum" x="${pad.l - 7}" y="${y + 4}" text-anchor="end">${label}</text>`);
+    const isTop = r === 0;
+    parts.push(
+      `<line x1="${pad.l}" y1="${y}" x2="${pad.l + colW * 6}" y2="${y}" stroke="${isTop ? DIAGRAM_COLORS.nut : DIAGRAM_COLORS.line}" stroke-width="${isTop ? 4 : 1.4}"/>`
+    );
   }
 
-  // 横线（品丝）
-  for (let r = 0; r <= rows; r += 1) {
-    const y = pad.t + r * rowH;
-    const isNut = start === 0 && r === 0;
-    parts.push(
-      `<line x1="${pad.l}" y1="${y}" x2="${pad.l + colW * 6}" y2="${y}" stroke="${isNut ? DIAGRAM_COLORS.nut : DIAGRAM_COLORS.line}" stroke-width="${isNut ? 4 : 1.4}"/>`
-    );
+  // 品格数字（格框左侧）：与对应品格竖直居中对齐，排列整齐规范
+  for (let b = 1; b <= rows; b += 1) {
+    const label = start + b;
+    const cy = pad.t + (b - 0.5) * rowH;
+    parts.push(`<text class="diagram-fretnum" x="${pad.l - 7}" y="${cy + 3}" text-anchor="end">${label}</text>`);
   }
 
   // 竖线（琴弦）
