@@ -150,6 +150,11 @@ const DIAGRAM_COLORS = {
   tone: "#f5a69c",
 };
 
+// 琴弦线宽：si=0（1弦/高音E，最细）→ si=5（6弦/低音E，最粗），相邻自然递减
+function stringWidth(si, thin, thick) {
+  return +(thin + (si / 5) * (thick - thin)).toFixed(2);
+}
+
 function buildVoicingSVG(v, type, tuning) {
   const frets = v.frets;
   const base = v.baseFret;
@@ -171,7 +176,7 @@ function buildVoicingSVG(v, type, tuning) {
     const y = pad.t + r * rowH;
     const isTop = r === 0;
     parts.push(
-      `<line x1="${pad.l}" y1="${y}" x2="${pad.l + colW * 6}" y2="${y}" stroke="${isTop ? DIAGRAM_COLORS.nut : DIAGRAM_COLORS.line}" stroke-width="${isTop ? 4 : 1.4}"/>`
+      `<line x1="${pad.l + colW / 2}" y1="${y}" x2="${pad.l + colW * 5.5}" y2="${y}" stroke="${isTop ? DIAGRAM_COLORS.nut : DIAGRAM_COLORS.line}" stroke-width="${isTop ? 6 : 5}"/>`
     );
   }
 
@@ -182,11 +187,12 @@ function buildVoicingSVG(v, type, tuning) {
     parts.push(`<text class="diagram-fretnum" x="${pad.l - 7}" y="${cy + 3}" text-anchor="end">${label}</text>`);
   }
 
-  // 竖线（琴弦）
+  // 竖线（琴弦）：粗细随物理弦号梯度（1弦最细 → 6弦最粗）
   order.forEach((si, col) => {
     const x = pad.l + col * colW + colW / 2;
+    const sw = stringWidth(si, 1.5, 4);
     parts.push(
-      `<line x1="${x}" y1="${pad.t}" x2="${x}" y2="${pad.t + rows * rowH}" stroke="${DIAGRAM_COLORS.line}" stroke-width="1.4"/>`
+      `<line x1="${x}" y1="${pad.t}" x2="${x}" y2="${pad.t + rows * rowH}" stroke="${DIAGRAM_COLORS.line}" stroke-width="${sw}"/>`
     );
   });
 
@@ -283,19 +289,20 @@ function buildFullFretboardSVG(type, tuning) {
     parts.push(`<text class="diagram-fretnum" x="${x}" y="${pad.t - 8}" text-anchor="middle">${f}</text>`);
   }
 
-  // 品丝竖线
+  // 品丝竖线：比琴弦粗，以突出指板分隔
   for (let f = 0; f <= maxFret; f += 1) {
     const x = pad.l + f * colW;
     const isNut = f === 0;
     parts.push(
-      `<line x1="${x}" y1="${pad.t}" x2="${x}" y2="${pad.t + 6 * rowH}" stroke="${isNut ? DIAGRAM_COLORS.nut : DIAGRAM_COLORS.line}" stroke-width="${isNut ? 4 : 1.4}"/>`
+      `<line x1="${x}" y1="${pad.t}" x2="${x}" y2="${pad.t + 6 * rowH}" stroke="${isNut ? DIAGRAM_COLORS.nut : DIAGRAM_COLORS.line}" stroke-width="${isNut ? 8 : 7}"/>`
     );
   }
 
-  // 琴弦横线 + 弦名
+  // 琴弦横线 + 弦名：粗细随物理弦号梯度（1弦最细 → 6弦最粗），右端止于最后一品（不溢出）
   order.forEach((si, row) => {
     const y = pad.t + row * rowH + rowH / 2;
-    parts.push(`<line x1="${pad.l}" y1="${y}" x2="${pad.l + (maxFret + 1) * colW}" y2="${y}" stroke="${DIAGRAM_COLORS.line}" stroke-width="1.4"/>`);
+    const sw = stringWidth(si, 2, 6);
+    parts.push(`<line x1="${pad.l}" y1="${y}" x2="${pad.l + maxFret * colW}" y2="${y}" stroke="${DIAGRAM_COLORS.line}" stroke-width="${sw}"/>`);
     parts.push(`<text class="diagram-stringname" x="${pad.l - 9}" y="${y + 3}" text-anchor="end">${noteName(tuning.pitches[si], state.accidental)}</text>`);
   });
 
