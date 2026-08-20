@@ -156,9 +156,9 @@ function buildVoicingSVG(v, type, tuning) {
   const start = base <= 1 ? 0 : base - 1;
   // 格数随跨度增长：start 比最低按品位低 1 格，跨度 4 时最多需要 6 格
   const rows = Math.max(4, Math.min(6, v.span + 2));
-  const pad = { t: 34, r: 16, b: 16, l: 24 };
-  const colW = 27;
-  const rowH = 30;
+  const pad = { t: 22, r: 10, b: 14, l: 16 };
+  const colW = 15;
+  const rowH = 15;
   const order = state.handed === "left" ? [5, 4, 3, 2, 1, 0] : [0, 1, 2, 3, 4, 5];
   const w = pad.l + colW * 6 + pad.r;
   const h = pad.t + rows * rowH + pad.b;
@@ -208,7 +208,7 @@ function buildVoicingSVG(v, type, tuning) {
     const x2 = pad.l + cols[cols.length - 1] * colW + colW / 2;
     const y = pad.t + (f - start) * rowH + rowH / 2;
     parts.push(
-      `<path d="M ${x1} ${y - 3} Q ${(x1 + x2) / 2} ${y - 11}, ${x2} ${y - 3}" fill="none" stroke="${DIAGRAM_COLORS.line}" stroke-width="2.2"/>`
+      `<path d="M ${x1} ${y - 2} Q ${(x1 + x2) / 2} ${y - 6}, ${x2} ${y - 2}" fill="none" stroke="${DIAGRAM_COLORS.line}" stroke-width="1.6"/>`
     );
   });
 
@@ -217,18 +217,18 @@ function buildVoicingSVG(v, type, tuning) {
     const x = pad.l + col * colW + colW / 2;
     const f = frets[si];
     if (f === -1) {
-      parts.push(`<text class="diagram-mute" x="${x}" y="${pad.t - 8}" text-anchor="middle">×</text>`);
+      parts.push(`<text class="diagram-mute" x="${x}" y="${pad.t - 7}" text-anchor="middle">×</text>`);
       return;
     }
     if (f === 0) {
-      parts.push(`<text class="diagram-open" x="${x}" y="${pad.t - 9}" text-anchor="middle">○</text>`);
+      parts.push(`<text class="diagram-open" x="${x}" y="${pad.t - 7}" text-anchor="middle">○</text>`);
       return;
     }
     const y = pad.t + (f - start) * rowH + rowH / 2;
     const isRoot = v.rootStrings.includes(si);
     const fill = isRoot ? DIAGRAM_COLORS.root : DIAGRAM_COLORS.tone;
     parts.push(
-      `<circle cx="${x}" cy="${y}" r="11" fill="${fill}" stroke="rgba(255,255,255,0.9)" stroke-width="2.5"/>`
+      `<circle cx="${x}" cy="${y}" r="6" fill="${fill}" stroke="rgba(255,255,255,0.9)" stroke-width="1.5"/>`
     );
     if (isRoot) {
       parts.push(`<text class="diagram-root" x="${x}" y="${y + 1}" text-anchor="middle" dominant-baseline="central">R</text>`);
@@ -244,7 +244,7 @@ function buildVoicingSVG(v, type, tuning) {
   order.forEach((si, col) => {
     const x = pad.l + col * colW + colW / 2;
     parts.push(
-      `<text class="diagram-stringname" x="${x}" y="${pad.t + rows * rowH + 14}" text-anchor="middle">${noteName(tuning.pitches[si], state.accidental)}</text>`
+      `<text class="diagram-stringname" x="${x}" y="${pad.t + rows * rowH + 11}" text-anchor="middle">${noteName(tuning.pitches[si], state.accidental)}</text>`
     );
   });
 
@@ -347,12 +347,7 @@ function renderHero() {
 }
 
 function voicingTag(v, index, group) {
-  const parts = [];
-  if (v.baseFret <= 4) parts.push("低把位");
-  else parts.push(`高把位 ${v.baseFret} 品起`);
-  const lowest = v.frets.findIndex((f) => f >= 0);
-  if (v.rootStrings.includes(lowest)) parts.push("低音为根音");
-  return `变体 ${index + 1} · ${parts.join(" · ")}`;
+  return `变体 ${index + 1}`;
 }
 
 function renderVoicings() {
@@ -441,7 +436,7 @@ function voicingMeta(v, tuning) {
   const rootFretTxt = fret === 0 ? "空弦" : `${fret} 品`;
   const played = v.frets.filter((f) => f >= 0).length;
   const open = v.frets.filter((f) => f === 0).length;
-  return `根音 ${stringName}弦${rootFretTxt} · ${played} 弦发声${open ? ` · ${open} 空弦` : ""}`;
+  return `根音 ${stringName}弦${rootFretTxt}${open ? ` · ${open} 空弦` : ""}`;
 }
 
 function renderSettings() {

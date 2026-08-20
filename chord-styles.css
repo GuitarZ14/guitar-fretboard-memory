@@ -755,59 +755,63 @@ button { color: inherit; cursor: pointer; }
 /* 变体网格 */
 .voicing-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 14px;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 8px;
   margin-top: 4px;
 }
 .voicing-card {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 8px;
-  padding: 12px 10px 10px;
+  gap: 4px;
+  margin: 0;
+  padding: 8px 6px 7px;
+  width: 100%;
+  min-width: 0;
   background: var(--surface);
   border: var(--clay-border-sm);
-  border-radius: 16px;
+  border-radius: 12px;
   box-shadow: var(--shadow-clay-sm);
   transition: translate .25s ease, box-shadow .25s ease;
 }
 .voicing-card:hover { translate: 0 -4px; box-shadow: var(--shadow-clay); }
 .voicing-tag {
-  font-size: 9px;
+  font-size: 8px;
   font-weight: 700;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--text-3);
-  padding: 3px 10px;
+  padding: 2px 8px;
   background: var(--surface);
   border: var(--clay-border-sm);
   border-radius: var(--radius-pill);
 }
 .chord-diagram {
   margin: 0;
+  width: 100%;
   max-width: 100%;
   line-height: 0;
 }
 .chord-diagram svg {
   width: 100%;
   height: auto;
-  max-width: 168px;
+  max-width: 110px;
 }
 .voicing-meta {
-  font-size: 10px;
+  font-size: 9px;
   font-weight: 600;
   color: var(--text-3);
-  line-height: 1.4;
+  line-height: 1.35;
   text-align: center;
 }
 
 /* SVG 内文本 */
-.diagram-fretnum { font-family: var(--font); font-size: 10px; font-weight: 700; fill: var(--text-3); }
-.diagram-stringname { font-family: var(--font); font-size: 9px; font-weight: 800; fill: var(--text-3); }
-.diagram-root { font-family: var(--font); font-size: 11px; font-weight: 800; fill: #ffffff; }
-.diagram-finger { font-family: var(--font); font-size: 10px; font-weight: 800; fill: var(--tone-ink); }
-.diagram-open { font-family: var(--font); font-size: 11px; font-weight: 800; fill: var(--text-2); }
-.diagram-mute { font-family: var(--font); font-size: 12px; font-weight: 800; fill: var(--text-3); }
+.diagram-fretnum { font-family: var(--font); font-size: 9px; font-weight: 700; fill: var(--text-3); }
+.diagram-stringname { font-family: var(--font); font-size: 8px; font-weight: 800; fill: var(--text-3); }
+.diagram-root { font-family: var(--font); font-size: 9px; font-weight: 800; fill: #ffffff; }
+.diagram-finger { font-family: var(--font); font-size: 8px; font-weight: 800; fill: var(--tone-ink); }
+.diagram-open { font-family: var(--font); font-size: 10px; font-weight: 800; fill: var(--text-2); }
+.diagram-mute { font-family: var(--font); font-size: 10px; font-weight: 800; fill: var(--text-3); }
 
 /* 全指板图 */
 .fretboard-wrap-diagram {
@@ -938,8 +942,7 @@ footer > span { margin-right: 2px; }
   .layout-left, .layout-right { position: static; }
   .chords-list-card { max-height: none; overflow: visible; }
   .root-buttons { grid-template-columns: repeat(6, 1fr); }
-  .voicing-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
-  .voicing-card { flex-direction: row; align-items: center; justify-content: center; gap: 12px; padding: 10px 12px; }
+  .voicing-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 9px; }
 }
 
 /* 移动端 ≤760px：单栏，顺序 主区 → 和弦列表 → 控制 → 理论 */
@@ -995,6 +998,8 @@ footer > span { margin-right: 2px; }
   .layout-right .type-group-btns {
     flex-wrap: nowrap;
     overflow-x: auto;
+    width: 100%;
+    min-width: 0;
     padding-bottom: 4px;
     scrollbar-width: thin;
     scrollbar-color: var(--text-3) transparent;
@@ -1002,9 +1007,8 @@ footer > span { margin-right: 2px; }
   }
   .layout-right .type-btn { flex: 0 0 auto; }
 
-  .voicing-grid { grid-template-columns: 1fr; gap: 12px; }
-  .voicing-card { flex-direction: row; align-items: center; justify-content: center; gap: 12px; padding: 10px 12px; }
-  .chord-diagram svg { max-width: 150px; }
+  .voicing-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 9px; }
+  .chord-diagram svg { max-width: 110px; }
   .voicing-tag { margin-right: 2px; }
 
   footer { margin-top: 12px; padding: 9px 0; font-size: 8px; }
