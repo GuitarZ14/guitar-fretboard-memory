@@ -151,8 +151,11 @@ function diatonicChords(root, scaleType, tuning, accidental) {
     const out = [];
     for (let i = 0; i < n; i += 1) {
       const rootSemi = scaleMod12(root + ivals[i]);
+      const rootIv = ivals[i]; // 该级音阶音的级内偏移，作为和弦根音参照
       const offsets = useSeventh ? [2, 4, 6] : [2, 4];
-      const relative = offsets.map((o) => scaleMod12(root + ivals[(i + o) % n]));
+      // 关键：和弦类型匹配需要“相对该级根音”的音程（vals[...] - rootIv），
+      // 之前误用了绝对半音（root + ivals[...]），导致 D/E/A/B 全部错配成 C 大调。
+      const relative = offsets.map((o) => scaleMod12(ivals[(i + o) % n] - rootIv));
       const key = intervalKey([0, ...relative]);
       const map = useSeventh ? SEVENTH_MAP : TRIAD_MAP;
       const typeId = map[key] || (useSeventh ? "7" : "major");
@@ -684,13 +687,25 @@ if (typeof document !== "undefined") {
   /* ---------- 渲染指板 ---------- */
   function renderFretboard() {
     const sc = currentScale();
+    const frets = state.frets;
     const svg = buildScaleFretboardSVG(state.root, sc, currentTuning(), {
-      frets: state.frets,
+      frets,
       labelMode: state.labelMode,
       accidental: state.accidental,
       highlight: highlightSet,
     });
     els.fretboard.innerHTML = svg;
+
+    // 品位数字条：与 SVG 品位列对齐（起始 = leftPad+colW，每格 colW）
+    const L = scaleFbLayout(frets);
+    els.fretNumbers.textContent = "";
+    els.fretNumbers.style.paddingLeft = `${L.leftPad + L.colW}px`;
+    for (let f = 1; f <= frets; f += 1) {
+      const span = document.createElement("span");
+      span.textContent = String(f);
+      span.style.width = `${L.colW}px`;
+      els.fretNumbers.append(span);
+    }
   }
 
   /* ---------- 渲染顺阶和弦 ---------- */

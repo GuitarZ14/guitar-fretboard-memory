@@ -56,6 +56,19 @@
 .scale-fretboard { cursor: pointer; }
 .scale-fretboard .fb-string-strip:hover { fill: rgba(79, 143, 176, 0.07); }
 
+/* 品位数字条：flex 布局，JS 设置 padding-left 与每格宽度，与 SVG 列对齐 */
+.fret-numbers {
+  display: flex;
+  align-items: center;
+  min-width: max-content;
+  margin-bottom: 6px;
+  font-size: 10px;
+  font-weight: 700;
+  text-align: center;
+  color: var(--text-3);
+}
+.fret-numbers span { flex: 0 0 auto; box-sizing: border-box; }
+
 /* 指板音级上标（SVG 文本） */
 .diagram-degree {
   font-family: var(--font);

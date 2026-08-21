@@ -20,8 +20,8 @@ class FakeClassList {
 }
 
 class FakeEl {
-  constructor(root = false) {
-    this.tagName = "div";
+  constructor(tag = "div", root = false) {
+    this.tagName = tag || "div";
     this.children = [];
     this.dataset = {};
     this.style = {};
@@ -35,7 +35,7 @@ class FakeEl {
     this._parent = root ? null : undefined; // 非 root 元素懒创建 parent，且不会无限递归
   }
   get parentElement() {
-    if (this._parent === undefined) this._parent = new FakeEl(true);
+    if (this._parent === undefined) this._parent = new FakeEl("div", true);
     return this._parent;
   }
   get className() { return this._className; }
@@ -48,6 +48,15 @@ class FakeEl {
     if (sel === "*") return true;
     const token = sel.trim().split(/\s+/)[0];
     if (token.startsWith("#")) return this.id === token.slice(1);
+    // 属性选择器 [data-x] / button[data-x="v"]
+    const attr = token.match(/^([a-zA-Z][a-zA-Z0-9-]*)?\[([a-zA-Z-]+)(?:="([^"]*)")?\]$/);
+    if (attr) {
+      const [, tag, a, val] = attr;
+      if (tag && this.tagName.toLowerCase() !== tag.toLowerCase()) return false;
+      const dv = this.dataset[a.replace(/^data-/, "")];
+      if (val !== undefined) return String(dv) === val;
+      return dv !== undefined;
+    }
     // 支持 ".a.b" / "button.a" 等复合类选择器
     const cls = [];
     let tag = token;
@@ -96,6 +105,22 @@ class FakeEl {
 
 const bySel = {};
 function getEl(sel) { if (!bySel[sel]) bySel[sel] = new FakeEl(); return bySel[sel]; }
+
+/* 预置三个分段控件（模拟 scales.html 静态按钮），init 时事件才能绑上去 */
+function mkSegBtn(attr, val) {
+  const b = new FakeEl("button");
+  b.dataset[attr] = val;
+  return b;
+}
+function seedSegmented(id, attr, values) {
+  const container = getEl(id);
+  values.forEach((v) => container.append(mkSegBtn(attr, v)));
+}
+seedSegmented("#rangeSwitch", "range", ["12", "22"]);
+seedSegmented("#octaveSwitch", "oct", ["1", "2"]);
+seedSegmented("#tempoSwitch", "tempo", ["620", "380", "240"]);
+seedSegmented("#accidentalSwitch", "acc", ["sharp", "flat"]);
+seedSegmented("#labelSwitch", "label", ["note", "degree"]);
 
 const documentStub = {
   querySelector(sel) { return getEl(sel); },
@@ -201,6 +226,45 @@ try {
   fireEvent(bySel["#playButton"], "click"); // 开始播放（会调度定时器）
   fireEvent(bySel["#playButton"], "click"); // 立即停止（清空定时器）
   console.log("✓ 播放/停止：无异常，定时器已清理");
+
+  /* ---- 交互 5：指板范围 12→22 品 ---- */
+  const rangeBtns = bySel["#rangeSwitch"].querySelectorAll("button");
+  const r22 = rangeBtns.find((b) => b.dataset.range === "22");
+  const fbBefore = bySel["#scaleFretboard"].innerHTML;
+  fireEvent(bySel["#rangeSwitch"], "click", r22);
+  const fbAfter = bySel["#scaleFretboard"].innerHTML;
+  assert.ok(fbBefore !== fbAfter, "切换指板范围后指板 SVG 应重新渲染");
+  assert.ok(r22.classList.contains("active"), "22 品按钮应高亮");
+  assert.ok(!rangeBtns.find((b) => b.dataset.range === "12").classList.contains("active"), "12 品按钮应取消高亮");
+  assert.ok(JSON.parse(localStorageStub._d["guitar-scale-practice-settings"]).frets === 22, "frets 应持久化为 22");
+  // 22 品 SVG 宽度应大于 12 品
+  const w22 = Number(/width="(\d+)"/.exec(fbAfter)[1]);
+  const w12 = Number(/width="(\d+)"/.exec(fbBefore)[1]);
+  assert.ok(w22 > w12, `22 品指板宽度应更大（${w12} → ${w22}）`);
+  console.log(`✓ 指板范围切换：12→22 品生效，SVG 宽度 ${w12}→${w22}`);
+
+  /* ---- 交互 6：音阶跨度 1→2 八度 ---- */
+  const octBtns = bySel["#octaveSwitch"].querySelectorAll("button");
+  const oct2 = octBtns.find((b) => b.dataset.oct === "2");
+  fireEvent(bySel["#octaveSwitch"], "click", oct2);
+  assert.ok(oct2.classList.contains("active"), "2 八度按钮应高亮");
+  assert.strictEqual(JSON.parse(localStorageStub._d["guitar-scale-practice-settings"]).octaves, 2, "octaves 应保存为 2");
+  console.log("✓ 音阶跨度切换：1→2 八度 状态已更新");
+
+  /* ---- 交互 7：播放速度 中→慢 ---- */
+  const tempoBtns = bySel["#tempoSwitch"].querySelectorAll("button");
+  const tSlow = tempoBtns.find((b) => b.dataset.tempo === "620");
+  fireEvent(bySel["#tempoSwitch"], "click", tSlow);
+  assert.ok(tSlow.classList.contains("active"), "慢速按钮应高亮");
+  assert.strictEqual(JSON.parse(localStorageStub._d["guitar-scale-practice-settings"]).tempo, 620, "tempo 应保存为 620");
+  console.log("✓ 播放速度切换：中→慢 状态已更新");
+
+  /* ---- 交互 8：播放序列随 octaves 变化 ---- */
+  const st = require("../scale-app.js");
+  const run1 = st.buildScaleRun(0, st.SCALE_TYPE_MAP.major, engine.TUNINGS.standard, 1);
+  const run2 = st.buildScaleRun(0, st.SCALE_TYPE_MAP.major, engine.TUNINGS.standard, 2);
+  assert.ok(run2.length > run1.length, `2 八度播放序列应更长（${run1.length} → ${run2.length}）`);
+  console.log(`✓ 播放序列跨度：1 八度 ${run1.length} 音 → 2 八度 ${run2.length} 音`);
 
   console.log("\n=== 冒烟测试全部通过 ===");
 } catch (e) {

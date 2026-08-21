@@ -24,6 +24,13 @@ function check(cond, msg) {
   if (!cond) errors.push(msg);
 }
 
+/* 计算 voicing 实际根音（rootStrings 首弦的 pitch class） */
+function voicingRootPc(v, tuning) {
+  if (!v.rootStrings || !v.rootStrings.length) return -1;
+  const si = v.rootStrings[0];
+  return scale.scaleMod12(tuning.pitches[si] + v.frets[si]);
+}
+
 /* ---------- 1. 指板 SVG 渲染 ---------- */
 for (const rid of scaleIds) {
   const st = scale.SCALE_TYPE_MAP[rid];
@@ -71,6 +78,8 @@ for (const rid of scaleIds) {
           const played = v.frets.filter((f) => f >= 0).length;
           const pressed = v.frets.filter((f) => f > 0).length;
           check(played >= 2 && pressed > 0 && v.rootStrings.length > 0, `空白/无效指法 ${rid}/${root}/${c.symbol}`);
+          // 根音正确性：指法实际根音必须等于该级和弦根音（防再次错配成其他根音）
+          check(voicingRootPc(v, tuning) === c.rootSemi, `和弦根音不符 ${rid}/${root}/${c.symbol} 期望${c.rootSemi} 实际${voicingRootPc(v, tuning)}`);
           const vsvg = scale.buildScaleVoicingSVG(v, engine.CHORD_TYPE_MAP[c.typeId], tuning, { handed: "right", accidental: "sharp" });
           check(vsvg.includes("<svg") && (vsvg.match(/<circle/g) || []).length > 0, `和弦指法图空 ${rid}/${root}/${c.symbol}`);
         }
