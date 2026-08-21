@@ -97,12 +97,17 @@ const outDir = path.resolve(__dirname, '..', 'samples');
 const midis = new Set();
 Object.values(TUNING_BASE_MIDI).forEach((arr) => arr.forEach((m) => midis.add(m)));
 
-console.log('生成空弦采样：');
+console.log('生成空弦采样（已存在的真实采样将被保留，不会覆盖）：');
 [...midis].sort((a, b) => a - b).forEach((m) => {
   const name = midiName(m);
+  const filePath = path.join(outDir, name + '.wav');
+  if (fs.existsSync(filePath)) {
+    console.log(`  跳过 ${name}.wav（已存在真实采样）`);
+    return;
+  }
   const freq = midiToFreq(m);
   const wav = ksPluck(freq, SR, DURATION);
-  writeWav(path.join(outDir, name + '.wav'), wav, SR);
+  writeWav(filePath, wav, SR);
   console.log(`  ${name}.wav  (MIDI ${m}, ${freq.toFixed(2)} Hz)`);
 });
 console.log('完成，输出目录：', outDir);

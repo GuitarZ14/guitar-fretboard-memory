@@ -105,102 +105,110 @@ const audioEngine = {
     for (let si = 0; si < 6; si += 1) this.loadSample(si);
   },
 
-  /* Karplus-Strong 实时合成 */
+  /* Karplus-Strong 合成（JS 侧逐样本生成，稳定收敛，规避 WebAudio 反馈回路发散）
+     延迟线 + 一阶平均低通（自然阻尼）+ 衰减增益(<1)，音色温暖、延音自然。 */
   playSynth(midi, velocity = 1) {
     const ctx = this.ctx;
     const t = ctx.currentTime;
     const freq = midiToFreq(midi);
+    const sr = ctx.sampleRate;
     const duration = 2.6;
+    const N = Math.max(2048, Math.floor(sr * duration));
 
-    // 激励：加半正弦窗的噪声，避免爆音、更接近指甲/拨片拨弦
-    const N = Math.max(2, Math.floor(ctx.sampleRate / freq)); // 一个周期的样本数
-    const buf = ctx.createBuffer(1, N, ctx.sampleRate);
-    const data = buf.getChannelData(0);
-    for (let i = 0; i < N; i += 1) {
-      const w = Math.sin((Math.PI * i) / N); // 平滑起落的窗
-      data[i] = (Math.random() * 2 - 1) * w;
+    // 延迟线长度 = 一个周期；整数延迟保证音高准确
+    const delayLen = Math.max(2, Math.round(sr / freq));
+    const ring = new Float32Array(delayLen);
+    for (let i = 0; i < delayLen; i += 1) ring[i] = Math.random() * 2 - 1;
+    // 平滑激励：对初始噪声做一次一阶低通，去掉过亮高频，更接近拨片拨弦
+    let prev = 0;
+    for (let i = 0; i < delayLen; i += 1) {
+      const c = ring[i];
+      ring[i] = (c + prev) * 0.5;
+      prev = c;
     }
-    const noise = ctx.createBufferSource();
-    noise.buffer = buf;
 
-    // 延迟线：长度 = 一个周期，浮点延迟支持任意音高
-    const delay = ctx.createDelay(1.0);
-    delay.delayTime.value = 1 / freq;
+    const out = new Float32Array(N);
+    let idx = 0;
+    const decay = 0.996; // <1：决定延音长度；一阶平均阻尼让高频更快衰减
+    for (let n = 0; n < N; n += 1) {
+      const cur = ring[idx];
+      const nxt = ring[(idx + 1) % delayLen];
+      const filt = (cur + nxt) * 0.5; // 反馈低通（平均），音色随延音逐渐变暗
+      out[n] = cur;
+      ring[idx] = filt * decay;
+      idx = (idx + 1) % delayLen;
+    }
+    // 短促起音与末端淡出，避免咔哒声
+    const attack = Math.floor(sr * 0.003);
+    for (let n = 0; n < attack; n += 1) out[n] *= n / attack;
+    const fade = Math.floor(sr * 0.05);
+    for (let n = 0; n < fade; n += 1) out[N - 1 - n] *= n / fade;
+    // 归一化到峰值 0.9
+    let peak = 0;
+    for (let n = 0; n < N; n += 1) peak = Math.max(peak, Math.abs(out[n]));
+    if (peak > 0) {
+      const g = 0.9 / peak;
+      for (let n = 0; n < N; n += 1) out[n] *= g;
+    }
 
-    // 反馈阻尼：低通让高频泛音更快衰减，音色随延音逐渐变暗（真实弦特性）
-    const damp = ctx.createBiquadFilter();
-    damp.type = "lowpass";
-    damp.frequency.value = Math.min(7000, freq * 4.5);
+    const ab = ctx.createBuffer(1, N, sr);
+    ab.getChannelData(0).set(out);
+    const src = ctx.createBufferSource();
+    src.buffer = ab;
 
-    // 反馈增益 <1：决定延音长度，低频更厚、高频更短
-    const fb = ctx.createGain();
-    fb.gain.value = 0.994;
-
-    // 输出级：轻微低通去掉刺耳超高频，再做音量包络
     const tone = ctx.createBiquadFilter();
     tone.type = "lowpass";
-    tone.frequency.value = Math.min(9000, freq * 7);
+    tone.frequency.value = 8000; // 去掉不可闻超高频毛刺
 
     const output = ctx.createGain();
     output.gain.setValueAtTime(0.0001, t);
-    output.gain.linearRampToValueAtTime(0.36 * velocity, t + 0.003);
+    output.gain.linearRampToValueAtTime(0.85 * velocity, t + 0.004);
     output.gain.exponentialRampToValueAtTime(0.0001, t + duration);
 
-    noise.connect(delay);     // 噪声注入延迟线
-    delay.connect(damp);      // 延迟线 → 阻尼
-    damp.connect(fb);         // 阻尼 → 反馈增益
-    fb.connect(delay);        // 反馈回延迟线（闭合回路）
-    delay.connect(tone);      // 发声路径
+    src.connect(tone);
     tone.connect(output);
     output.connect(ctx.destination);
 
-    noise.start(t);
-    noise.stop(t + N / ctx.sampleRate + 0.02);
+    src.start(t);
 
     setTimeout(() => {
-      try {
-        noise.disconnect();
-        delay.disconnect();
-        damp.disconnect();
-        fb.disconnect();
-        tone.disconnect();
-        output.disconnect();
-      } catch {}
+      try { src.disconnect(); tone.disconnect(); output.disconnect(); } catch {}
     }, (duration + 0.2) * 1000);
   },
 
   /* 采样 + 变调（playbackRate）播放；加载失败自动回退合成 */
   playSample(si, fret, velocity = 1) {
     const ctx = this.ctx;
-    const t = ctx.currentTime;
+    // 注意：t 必须在异步加载完成后重新取当前时间，否则包络时间点已过期导致静音
     return this.loadSample(si).then((buf) => {
       if (!buf) {
         this.playSynth(TUNING_BASE_MIDI[state.tuningId][si] + fret, velocity);
         return;
       }
+      const t = ctx.currentTime;
       const rate = Math.pow(2, fret / 12);
       const src = ctx.createBufferSource();
       src.buffer = buf;
       src.playbackRate.value = rate;
 
-      const body = ctx.createBiquadFilter();
-      body.type = "bandpass";
-      body.frequency.value = Math.max(120, Math.min(360, midiToFreq(TUNING_BASE_MIDI[state.tuningId][si] + fret) * 0.35));
-      body.Q.value = 1.2;
+      // 轻微低通，去掉录音中的高频毛刺，保留自然音色（不做窄带滤波，避免削弱基频）
+      const tone = ctx.createBiquadFilter();
+      tone.type = "lowpass";
+      tone.frequency.value = 7000;
 
       const output = ctx.createGain();
       const effDur = buf.duration / rate;
-      output.gain.setValueAtTime(0, t);
-      output.gain.linearRampToValueAtTime(0.95 * velocity, t + 0.004);
+      output.gain.setValueAtTime(0.0001, t);
+      output.gain.linearRampToValueAtTime(0.9 * velocity, t + 0.005);
       output.gain.exponentialRampToValueAtTime(0.0001, t + effDur + 0.05);
 
-      src.connect(body);
-      body.connect(output);
+      src.connect(tone);
+      tone.connect(output);
       output.connect(ctx.destination);
 
       src.start(t);
       setTimeout(() => {
-        try { src.disconnect(); body.disconnect(); output.disconnect(); } catch {}
+        try { src.disconnect(); tone.disconnect(); output.disconnect(); } catch {}
       }, (effDur + 0.3) * 1000);
     });
   },
