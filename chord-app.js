@@ -112,57 +112,61 @@ const audioEngine = {
     const freq = midiToFreq(midi);
     const duration = 2.6;
 
-    // Karplus-Strong 激励噪声
-    const samples = Math.max(1, Math.floor(ctx.sampleRate / freq));
-    const buf = ctx.createBuffer(1, samples, ctx.sampleRate);
+    // 激励：加半正弦窗的噪声，避免爆音、更接近指甲/拨片拨弦
+    const N = Math.max(2, Math.floor(ctx.sampleRate / freq)); // 一个周期的样本数
+    const buf = ctx.createBuffer(1, N, ctx.sampleRate);
     const data = buf.getChannelData(0);
-    for (let i = 0; i < samples; i += 1) data[i] = Math.random() * 2 - 1;
-    const src = ctx.createBufferSource();
-    src.buffer = buf;
+    for (let i = 0; i < N; i += 1) {
+      const w = Math.sin((Math.PI * i) / N); // 平滑起落的窗
+      data[i] = (Math.random() * 2 - 1) * w;
+    }
+    const noise = ctx.createBufferSource();
+    noise.buffer = buf;
 
-    const excite = ctx.createGain();
-    excite.gain.value = 0.55;
-
+    // 延迟线：长度 = 一个周期，浮点延迟支持任意音高
     const delay = ctx.createDelay(1.0);
     delay.delayTime.value = 1 / freq;
 
-    const filter = ctx.createBiquadFilter();
-    filter.type = "lowpass";
-    filter.frequency.value = Math.min(7500, freq * 3.5);
-    filter.Q.value = 0.35;
+    // 反馈阻尼：低通让高频泛音更快衰减，音色随延音逐渐变暗（真实弦特性）
+    const damp = ctx.createBiquadFilter();
+    damp.type = "lowpass";
+    damp.frequency.value = Math.min(7000, freq * 4.5);
 
-    // 琴体共鸣
-    const body = ctx.createBiquadFilter();
-    body.type = "bandpass";
-    body.frequency.value = Math.max(120, Math.min(360, freq * 0.35));
-    body.Q.value = 1.8;
+    // 反馈增益 <1：决定延音长度，低频更厚、高频更短
+    const fb = ctx.createGain();
+    fb.gain.value = 0.994;
+
+    // 输出级：轻微低通去掉刺耳超高频，再做音量包络
+    const tone = ctx.createBiquadFilter();
+    tone.type = "lowpass";
+    tone.frequency.value = Math.min(9000, freq * 7);
 
     const output = ctx.createGain();
-    output.gain.setValueAtTime(0, t);
-    output.gain.linearRampToValueAtTime(0.38 * velocity, t + 0.004);
+    output.gain.setValueAtTime(0.0001, t);
+    output.gain.linearRampToValueAtTime(0.36 * velocity, t + 0.003);
     output.gain.exponentialRampToValueAtTime(0.0001, t + duration);
 
-    src.connect(excite);
-    excite.connect(delay);
-    delay.connect(filter);
-    filter.connect(delay); // 反馈回路
-    delay.connect(body);
-    body.connect(output);
+    noise.connect(delay);     // 噪声注入延迟线
+    delay.connect(damp);      // 延迟线 → 阻尼
+    damp.connect(fb);         // 阻尼 → 反馈增益
+    fb.connect(delay);        // 反馈回延迟线（闭合回路）
+    delay.connect(tone);      // 发声路径
+    tone.connect(output);
     output.connect(ctx.destination);
 
-    src.start(t);
-    src.stop(t + samples / ctx.sampleRate);
+    noise.start(t);
+    noise.stop(t + N / ctx.sampleRate + 0.02);
 
     setTimeout(() => {
       try {
-        src.disconnect();
-        excite.disconnect();
+        noise.disconnect();
         delay.disconnect();
-        filter.disconnect();
-        body.disconnect();
+        damp.disconnect();
+        fb.disconnect();
+        tone.disconnect();
         output.disconnect();
       } catch {}
-    }, (duration + 0.25) * 1000);
+    }, (duration + 0.2) * 1000);
   },
 
   /* 采样 + 变调（playbackRate）播放；加载失败自动回退合成 */
