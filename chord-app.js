@@ -15,6 +15,7 @@ const DEFAULT_STATE = {
   accidental: "sharp",
   view: "voicing",  // voicing | fretboard
   fbLabelMode: "degree", // degree | note
+  toneMode: "synth", // synth | sample
 };
 
 function loadState() {
@@ -29,6 +30,7 @@ function loadState() {
         accidental: saved.accidental === "flat" ? "flat" : "sharp",
         view: saved.view === "fretboard" ? "fretboard" : "voicing",
         fbLabelMode: saved.fbLabelMode === "note" ? "note" : "degree",
+        toneMode: saved.toneMode === "sample" ? "sample" : "synth",
       };
     }
   } catch {
@@ -39,7 +41,7 @@ function loadState() {
 
 const state = loadState();
 
-/* ---------------- 音频：Web Audio API + Karplus-Strong 合成原声吉他音色 ---------------- */
+/* ---------------- 音频：合成 + 采样双引擎 ---------------- */
 const TUNING_BASE_MIDI = {
   standard: [40, 45, 50, 55, 59, 64], // 6弦..1弦 (EADGBE)
   dropD:    [38, 45, 50, 55, 59, 64],
@@ -53,8 +55,16 @@ function midiToFreq(midi) {
   return 440 * Math.pow(2, (midi - 69) / 12);
 }
 
-const guitarAudio = {
+/* 采样目录：离线 samples/ 或 CDN。按空弦音名命名，如 E2.wav。
+   若使用 CDN，可将 SAMPLE_BASE 改为完整 URL（需服务端允许 CORS）。 */
+const SAMPLE_BASE = "samples/";
+
+const audioEngine = {
   ctx: null,
+  mode: "synth",
+  buffers: Object.create(null), // si -> AudioBuffer（空弦采样）
+  loading: Object.create(null), // si -> Promise
+
   ensure() {
     if (!this.ctx) {
       this.ctx = new (window.AudioContext || window.webkitAudioContext)();
@@ -63,8 +73,40 @@ const guitarAudio = {
       this.ctx.resume();
     }
   },
-  play(midi, velocity = 1) {
+
+  // 清空采样缓存（调音切换后空弦音高变化，需重新加载对应采样）
+  clearSamples() {
+    this.buffers = Object.create(null);
+    this.loading = Object.create(null);
+  },
+
+  sampleName(si) {
+    const midi = TUNING_BASE_MIDI[state.tuningId][si];
+    const name = PITCH_SHARP[((midi % 12) + 12) % 12];
+    const octave = Math.floor(midi / 12) - 1;
+    return name + octave + ".wav";
+  },
+
+  loadSample(si) {
+    if (this.buffers[si]) return Promise.resolve(this.buffers[si]);
+    if (this.loading[si]) return this.loading[si];
+    const url = SAMPLE_BASE + this.sampleName(si);
+    const p = fetch(url)
+      .then((r) => { if (!r.ok) throw new Error("HTTP " + r.status); return r.arrayBuffer(); })
+      .then((ab) => this.ctx.decodeAudioData(ab))
+      .then((decoded) => { this.buffers[si] = decoded; return decoded; })
+      .catch((err) => { console.warn("[音频] 采样加载失败，回退合成：", url, err); return null; });
+    this.loading[si] = p;
+    return p;
+  },
+
+  preloadAll() {
     this.ensure();
+    for (let si = 0; si < 6; si += 1) this.loadSample(si);
+  },
+
+  /* Karplus-Strong 实时合成 */
+  playSynth(midi, velocity = 1) {
     const ctx = this.ctx;
     const t = ctx.currentTime;
     const freq = midiToFreq(midi);
@@ -74,9 +116,7 @@ const guitarAudio = {
     const samples = Math.max(1, Math.floor(ctx.sampleRate / freq));
     const buf = ctx.createBuffer(1, samples, ctx.sampleRate);
     const data = buf.getChannelData(0);
-    for (let i = 0; i < samples; i += 1) {
-      data[i] = Math.random() * 2 - 1;
-    }
+    for (let i = 0; i < samples; i += 1) data[i] = Math.random() * 2 - 1;
     const src = ctx.createBufferSource();
     src.buffer = buf;
 
@@ -124,6 +164,51 @@ const guitarAudio = {
       } catch {}
     }, (duration + 0.25) * 1000);
   },
+
+  /* 采样 + 变调（playbackRate）播放；加载失败自动回退合成 */
+  playSample(si, fret, velocity = 1) {
+    const ctx = this.ctx;
+    const t = ctx.currentTime;
+    return this.loadSample(si).then((buf) => {
+      if (!buf) {
+        this.playSynth(TUNING_BASE_MIDI[state.tuningId][si] + fret, velocity);
+        return;
+      }
+      const rate = Math.pow(2, fret / 12);
+      const src = ctx.createBufferSource();
+      src.buffer = buf;
+      src.playbackRate.value = rate;
+
+      const body = ctx.createBiquadFilter();
+      body.type = "bandpass";
+      body.frequency.value = Math.max(120, Math.min(360, midiToFreq(TUNING_BASE_MIDI[state.tuningId][si] + fret) * 0.35));
+      body.Q.value = 1.2;
+
+      const output = ctx.createGain();
+      const effDur = buf.duration / rate;
+      output.gain.setValueAtTime(0, t);
+      output.gain.linearRampToValueAtTime(0.95 * velocity, t + 0.004);
+      output.gain.exponentialRampToValueAtTime(0.0001, t + effDur + 0.05);
+
+      src.connect(body);
+      body.connect(output);
+      output.connect(ctx.destination);
+
+      src.start(t);
+      setTimeout(() => {
+        try { src.disconnect(); body.disconnect(); output.disconnect(); } catch {}
+      }, (effDur + 0.3) * 1000);
+    });
+  },
+
+  play(si, fret, velocity = 1) {
+    this.ensure();
+    if (this.mode === "sample") {
+      this.playSample(si, fret, velocity);
+    } else {
+      this.playSynth(TUNING_BASE_MIDI[state.tuningId][si] + fret, velocity);
+    }
+  },
 };
 
 function fretFromX(x, start, leftPad, colW, end) {
@@ -168,6 +253,7 @@ const elements = {
   handSwitch: document.querySelector("#handSwitch"),
   accidentalSwitch: document.querySelector("#accidentalSwitch"),
   viewSwitch: document.querySelector("#viewSwitch"),
+  toneSwitch: document.querySelector("#toneSwitch"),
   chordNameCard: document.querySelector(".chord-name-card"),
 };
 
@@ -656,6 +742,8 @@ function renderSettings() {
   refreshSegmented(elements.handSwitch, "hand", state.handed);
   refreshSegmented(elements.accidentalSwitch, "acc", state.accidental);
   refreshSegmented(elements.viewSwitch, "view", state.view);
+  refreshSegmented(elements.toneSwitch, "tone", state.toneMode);
+  audioEngine.mode = state.toneMode;
 }
 
 function renderAll() {
@@ -683,6 +771,7 @@ elements.typeGroups.addEventListener("click", (e) => {
 
 elements.tuningSelect.addEventListener("change", () => {
   state.tuningId = elements.tuningSelect.value;
+  audioEngine.clearSamples(); // 空弦音高变化，丢弃旧采样缓存
   renderAll();
 });
 
@@ -705,6 +794,16 @@ elements.viewSwitch.addEventListener("click", (e) => {
   if (!btn) return;
   state.view = btn.dataset.view;
   renderAll();
+});
+
+elements.toneSwitch.addEventListener("click", (e) => {
+  const btn = e.target.closest("button[data-tone]");
+  if (!btn) return;
+  state.toneMode = btn.dataset.tone;
+  audioEngine.mode = state.toneMode;
+  refreshSegmented(elements.toneSwitch, "tone", state.toneMode);
+  if (state.toneMode === "sample") audioEngine.preloadAll(); // 提前加载采样，点击更跟手
+  saveState();
 });
 
 /* 切换指板标记显示模式（级数 / 音名），仅更新 SVG 文字，不重绘指板，保留滚动位置与已加载高把位 */
@@ -742,8 +841,6 @@ elements.fretboardArea.addEventListener("click", (e) => {
   const svg = strip.closest("svg");
   if (!svg) return;
 
-  guitarAudio.ensure();
-
   const si = Number(strip.dataset.si);
   const start = Number(strip.dataset.start);
   const end = Number(strip.dataset.end);
@@ -753,8 +850,7 @@ elements.fretboardArea.addEventListener("click", (e) => {
   const padT = Number(strip.dataset.padT);
 
   const fret = fretFromX(e.offsetX, start, leftPad, colW, end);
-  const midi = TUNING_BASE_MIDI[state.tuningId][si] + fret;
-  guitarAudio.play(midi);
+  audioEngine.play(si, fret, 1);
   showFretHit(svg, si, fret, start, leftPad, colW, rowH, padT);
 });
 

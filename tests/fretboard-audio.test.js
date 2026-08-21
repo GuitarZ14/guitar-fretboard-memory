@@ -80,10 +80,10 @@ function check(name, cond, detail) {
   // 在页面暴露最后播放的 MIDI，便于测试断言
   await page.evaluate(() => {
     window.__lastPlayedMidi = null;
-    const orig = guitarAudio.play.bind(guitarAudio);
-    guitarAudio.play = function (midi, velocity) {
-      window.__lastPlayedMidi = midi;
-      return orig(midi, velocity);
+    const orig = audioEngine.play.bind(audioEngine);
+    audioEngine.play = function (si, fret, velocity) {
+      window.__lastPlayedMidi = (TUNING_BASE_MIDI[state.tuningId][si] + fret);
+      return orig(si, fret, velocity);
     };
   });
 
@@ -101,7 +101,7 @@ function check(name, cond, detail) {
   await page.waitForTimeout(200);
 
   const audioState = await page.evaluate(() => ({
-    ctxState: guitarAudio.ctx ? guitarAudio.ctx.state : null,
+    ctxState: audioEngine.ctx ? audioEngine.ctx.state : null,
     lastMidi: window.__lastPlayedMidi,
   }));
   check('点击后 AudioContext 已创建并恢复', audioState.ctxState === 'running', 'state=' + audioState.ctxState);
@@ -118,6 +118,42 @@ function check(name, cond, detail) {
   await page.waitForTimeout(200);
   const midi3 = await page.evaluate(() => window.__lastPlayedMidi);
   check('点击 6 弦 3 品播放 G2 (MIDI 43)', midi3 === 43, 'lastMidi=' + midi3);
+
+  console.log('\n[采样模式切换与发声]');
+  // 切换到采样模式
+  await page.click('#toneSwitch button[data-tone="sample"]');
+  await page.waitForTimeout(300);
+  const tonePressed = await page.$eval('#toneSwitch button[data-tone="sample"]', (el) => el.getAttribute('aria-pressed'));
+  const toneActive = await page.$eval('#toneSwitch button[data-tone="sample"]', (el) => el.classList.contains('active'));
+  check('点击「采样」→ 该按钮 aria-pressed=true', tonePressed === 'true', 'pressed=' + tonePressed);
+  check('点击「采样」→ 该按钮高亮', toneActive);
+
+  // 采样模式下再次点击，应仍按音高播放（override 拦截 midi）
+  await page.mouse.click(Math.round(clickX), Math.round(clickY));
+  await page.waitForTimeout(300);
+  const sampleMidi = await page.evaluate(() => window.__lastPlayedMidi);
+  check('采样模式点击 6 弦左侧仍播放 E2 (MIDI 40)', sampleMidi === 40, 'lastMidi=' + sampleMidi);
+
+  // 验证确实发起了采样文件请求（offline samples/E2.wav）
+  const sampleReq = await page.evaluate(async () => {
+    try {
+      const r = await fetch('samples/' + (PITCH_SHARP[((TUNING_BASE_MIDI[state.tuningId][0]) % 12 + 12) % 12] + (Math.floor(TUNING_BASE_MIDI[state.tuningId][0] / 12) - 1) + '.wav'));
+      return r.ok;
+    } catch (e) { return false; }
+  });
+  check('采样文件可加载（samples/E2.wav 可访问）', sampleReq === true, 'ok=' + sampleReq);
+
+  // 验证采样被解码为 AudioBuffer（decodeAudioData 成功）
+  const decoded = await page.evaluate(async () => {
+    await audioEngine.loadSample(0);
+    const buf = audioEngine.buffers[0];
+    return buf ? { ok: true, duration: buf.duration, sr: buf.sampleRate } : { ok: false };
+  });
+  check('采样被解码为 AudioBuffer（decodeAudioData 成功）', decoded.ok && decoded.duration > 1, JSON.stringify(decoded));
+
+  // 切回合成模式，避免影响后续用例
+  await page.click('#toneSwitch button[data-tone="synth"]');
+  await page.waitForTimeout(100);
 
   console.log('\n[高把位动态加载后检查]');
   await page.evaluate(() => {
