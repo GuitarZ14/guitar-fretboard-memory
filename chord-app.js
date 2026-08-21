@@ -15,7 +15,6 @@ const DEFAULT_STATE = {
   accidental: "sharp",
   view: "voicing",  // voicing | fretboard
   fbLabelMode: "degree", // degree | note
-  toneMode: "synth", // synth | sample
 };
 
 function loadState() {
@@ -30,7 +29,6 @@ function loadState() {
         accidental: saved.accidental === "flat" ? "flat" : "sharp",
         view: saved.view === "fretboard" ? "fretboard" : "voicing",
         fbLabelMode: saved.fbLabelMode === "note" ? "note" : "degree",
-        toneMode: saved.toneMode === "sample" ? "sample" : "synth",
       };
     }
   } catch {
@@ -41,7 +39,7 @@ function loadState() {
 
 const state = loadState();
 
-/* ---------------- 音频：合成 + 采样双引擎 ---------------- */
+/* ---------------- 音频：Karplus-Strong 合成引擎 ---------------- */
 const TUNING_BASE_MIDI = {
   standard: [40, 45, 50, 55, 59, 64], // 6弦..1弦 (EADGBE)
   dropD:    [38, 45, 50, 55, 59, 64],
@@ -55,48 +53,8 @@ function midiToFreq(midi) {
   return 440 * Math.pow(2, (midi - 69) / 12);
 }
 
-/* 采样目录：离线 samples/ 或 CDN。按空弦音名命名，如 E2.wav。
-   若使用 CDN，可将 SAMPLE_BASE 改为完整 URL（需服务端允许 CORS）。 */
-const SAMPLE_BASE = "https://media.githubusercontent.com/media/cluesurf/wavebase/make/base/guitar/parker-fly/";
-const SAMPLE_MAX_DUR = 4.5; // 秒：裁掉过长尾音，降低内存占用
-
-/* 由 SAMPLE_INDEX 构建 音高(MIDI) -> 真实录音列表 的查找表。
-   wavebase 的采样文件名已包含真实音名 token（如 E2 / F#5），token 即该录音的精确音高，
-   因此直接解析 token 得到 MIDI，而不是假设录制调弦（实际 6 弦为 Drop-D），最稳健。
-   运行时按目标音高（已含调弦与品位）选取对应品位的真实录音，绝不做 playbackRate 变调。 */
-function tokenToMidi(tok) {
-  const m = /^([A-G])([#bx]*)([0-9]+)$/.exec(tok);
-  if (!m) return null;
-  const base = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 }[m[1]];
-  let acc = 0;
-  for (const c of m[2]) acc += c === "#" ? 1 : c === "b" ? -1 : c === "x" ? 2 : 0;
-  const oct = parseInt(m[3], 10);
-  return (oct + 1) * 12 + base + acc;
-}
-
-const SAMPLE_BY_MIDI = (function () {
-  const map = Object.create(null);
-  const idx = window.SAMPLE_INDEX;
-  if (idx) {
-    for (let N = 1; N <= 6; N += 1) {
-      const frets = idx[String(N)] || {};
-      for (const fk of Object.keys(frets)) {
-        const token = frets[fk][0];
-        const takes = frets[fk][1];
-        const midi = tokenToMidi(token); // token 即真实音高（含品位信息）
-        if (midi == null) continue;
-        (map[midi] || (map[midi] = [])).push({ N, fret: parseInt(fk, 10), token, takes });
-      }
-    }
-  }
-  return map;
-})();
-
 const audioEngine = {
   ctx: null,
-  mode: "synth",
-  buffers: Object.create(null), // si -> AudioBuffer（空弦采样）
-  loading: Object.create(null), // si -> Promise
 
   ensure() {
     if (!this.ctx) {
@@ -105,63 +63,6 @@ const audioEngine = {
     if (this.ctx.state === "suspended") {
       this.ctx.resume();
     }
-  },
-
-  // 清空采样缓存（按键缓存已含音高信息，一般无需调用）
-  clearSamples() {
-    this.buffers = Object.create(null);
-    this.loading = Object.create(null);
-  },
-
-  // 为目标 (弦 si, 品位 fret, 调弦) 选取真实录音：优先同物理弦音色，否则任取该音高的录音
-  // 本项目弦号 si: 0=最粗低音弦(6弦) .. 5=最细高音弦(1弦)
-  // wavebase 弦号 N: 1=最细高音弦 .. 6=最粗低音弦  →  故同弦对应 N = 6 - si
-  // 返回 null 表示无可用真实采样（需回退合成）
-  pickSample(si, fret, tuningId) {
-    const targetMidi = TUNING_BASE_MIDI[tuningId][si] + fret;
-    const list = SAMPLE_BY_MIDI[targetMidi];
-    if (!list || list.length === 0) return null;
-    const sameString = 6 - si;
-    const entry = list.find((e) => e.N === sameString) || list[0];
-    const take = entry.takes[Math.floor(Math.random() * entry.takes.length)];
-    return { N: entry.N, fret: entry.fret, token: entry.token, take, targetMidi };
-  },
-
-  sampleUrl(N, fret, token, take) {
-    const ff = String(fret).padStart(2, "0");
-    return SAMPLE_BASE + "string-" + N + "/string-" + N + "-note-" + token + "-fret-" + ff + "-" + take + ".wav";
-  },
-
-  // 按 (弦号, 品位, take) 加载并解码真实采样（带缓存）；失败返回 null
-  loadSampleBuffer(N, fret, token, take) {
-    const key = N + "_" + fret + "_" + take;
-    if (this.buffers[key]) return Promise.resolve(this.buffers[key]);
-    if (this.loading[key]) return this.loading[key];
-    const url = this.sampleUrl(N, fret, token, take);
-    const p = fetch(url)
-      .then((r) => { if (!r.ok) throw new Error("HTTP " + r.status); return r.arrayBuffer(); })
-      .then((ab) => this.ctx.decodeAudioData(ab))
-      .then((decoded) => this._prep(decoded))
-      .then((prep) => { this.buffers[key] = prep; return prep; })
-      .catch((err) => { console.warn("[音频] 真实采样加载失败，回退合成：", url, err); return null; });
-    this.loading[key] = p;
-    return p;
-  },
-
-  // 解码后处理：立体声→单声道（省内存/CPU），裁掉过长尾音
-  _prep(buf) {
-    const ch = buf.numberOfChannels;
-    const len = Math.min(buf.length, Math.floor(buf.sampleRate * SAMPLE_MAX_DUR));
-    const mono = this.ctx.createBuffer(1, len, buf.sampleRate);
-    const out = mono.getChannelData(0);
-    if (ch === 1) {
-      out.set(buf.getChannelData(0).subarray(0, len));
-    } else {
-      const a = buf.getChannelData(0).subarray(0, len);
-      const b = buf.getChannelData(1).subarray(0, len);
-      for (let i = 0; i < len; i += 1) out[i] = (a[i] + b[i]) * 0.5;
-    }
-    return mono;
   },
 
   /* Karplus-Strong 合成（JS 侧逐样本生成，稳定收敛，规避 WebAudio 反馈回路发散）
@@ -235,48 +136,9 @@ const audioEngine = {
     }, (duration + 0.2) * 1000);
   },
 
-  /* 真实采样播放：直接使用对应品位的录音，绝不变调（无 playbackRate），从根本上消除机械感。
-     对重复点击随机选不同 take + 轻微随机增益，增加自然变化、避免机械重复。 */
-  playSample(si, fret, velocity = 1) {
-    const ctx = this.ctx;
-    const pick = this.pickSample(si, fret, state.tuningId);
-    if (!pick) {
-      this.playSynth(TUNING_BASE_MIDI[state.tuningId][si] + fret, velocity);
-      return;
-    }
-    return this.loadSampleBuffer(pick.N, pick.fret, pick.token, pick.take).then((buf) => {
-      const t = ctx.currentTime; // 异步加载完成后重取当前时间，避免包络过期致静音
-      if (!buf) {
-        this.playSynth(pick.targetMidi, velocity);
-        return;
-      }
-      const src = ctx.createBufferSource();
-      src.buffer = buf;
-
-      // 轻微随机增益，避免连续点击同一音的机械重复感
-      const gainVar = 0.88 + Math.random() * 0.12;
-      const output = ctx.createGain();
-      output.gain.setValueAtTime(0.0001, t);
-      output.gain.linearRampToValueAtTime(0.9 * velocity * gainVar, t + 0.004);
-      output.gain.exponentialRampToValueAtTime(0.0001, t + buf.duration + 0.05);
-
-      src.connect(output);
-      output.connect(ctx.destination);
-
-      src.start(t);
-      setTimeout(() => {
-        try { src.disconnect(); output.disconnect(); } catch {}
-      }, (buf.duration + 0.3) * 1000);
-    });
-  },
-
   play(si, fret, velocity = 1) {
     this.ensure();
-    if (this.mode === "sample") {
-      this.playSample(si, fret, velocity);
-    } else {
-      this.playSynth(TUNING_BASE_MIDI[state.tuningId][si] + fret, velocity);
-    }
+    this.playSynth(TUNING_BASE_MIDI[state.tuningId][si] + fret, velocity);
   },
 };
 
@@ -322,7 +184,6 @@ const elements = {
   handSwitch: document.querySelector("#handSwitch"),
   accidentalSwitch: document.querySelector("#accidentalSwitch"),
   viewSwitch: document.querySelector("#viewSwitch"),
-  toneSwitch: document.querySelector("#toneSwitch"),
   chordNameCard: document.querySelector(".chord-name-card"),
 };
 
@@ -811,8 +672,6 @@ function renderSettings() {
   refreshSegmented(elements.handSwitch, "hand", state.handed);
   refreshSegmented(elements.accidentalSwitch, "acc", state.accidental);
   refreshSegmented(elements.viewSwitch, "view", state.view);
-  refreshSegmented(elements.toneSwitch, "tone", state.toneMode);
-  audioEngine.mode = state.toneMode;
 }
 
 function renderAll() {
@@ -840,7 +699,6 @@ elements.typeGroups.addEventListener("click", (e) => {
 
 elements.tuningSelect.addEventListener("change", () => {
   state.tuningId = elements.tuningSelect.value;
-  audioEngine.clearSamples(); // 空弦音高变化，丢弃旧采样缓存
   renderAll();
 });
 
@@ -863,16 +721,6 @@ elements.viewSwitch.addEventListener("click", (e) => {
   if (!btn) return;
   state.view = btn.dataset.view;
   renderAll();
-});
-
-elements.toneSwitch.addEventListener("click", (e) => {
-  const btn = e.target.closest("button[data-tone]");
-  if (!btn) return;
-  state.toneMode = btn.dataset.tone;
-  audioEngine.mode = state.toneMode;
-  refreshSegmented(elements.toneSwitch, "tone", state.toneMode);
-  // 真实采样按需懒加载（按品位精准取用，无需提前批量预载）
-  saveState();
 });
 
 /* 切换指板标记显示模式（级数 / 音名），仅更新 SVG 文字，不重绘指板，保留滚动位置与已加载高把位 */
