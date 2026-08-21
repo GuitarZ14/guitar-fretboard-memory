@@ -1014,7 +1014,7 @@ function timerLoop(now) {
     const elapsed = now - state.startedAt;
     const practice = state.mode === "practice";
 
-    // 自动模式：浏览模式下，延时到「显示秒」时亮出答案，保持「维持秒」后自动进入下一题
+    // 限时模式：浏览模式下，延时到「限时反应」时亮出答案，保持「维持秒」后自动进入下一题
     if (!practice && elements.autoRevealToggle.checked && !state.summaryOpen) {
       const atMs = clampNumber(elements.autoRevealAtSeconds) * 1000;
       const holdMs = clampNumber(elements.autoRevealHoldSeconds) * 1000;

@@ -109,7 +109,7 @@ async function box(page, sel) {
   check('含 autoRevealCard', cardsInSidebar.includes('autoRevealCard'));
   check('含 accidentalsCard', cardsInSidebar.includes('accidentalsCard'));
   check('含 difficultyCard', cardsInSidebar.includes('difficultyCard'));
-  check('卡片顺序：自动模式 → 包含升降号 → 练习难度',
+  check('卡片顺序：限时模式 → 包含升降号 → 练习难度',
     JSON.stringify(cardsInSidebar) === JSON.stringify(['autoRevealCard', 'accidentalsCard', 'difficultyCard']),
     cardsInSidebar.join(' > '));
 

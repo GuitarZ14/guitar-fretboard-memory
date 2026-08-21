@@ -38,23 +38,23 @@
             <div class="control-title-row">
               <div class="control-icon" aria-hidden="true">◎</div>
               <div>
-                <h2>自动模式</h2>
-                <p>延时显示答案并自动进入下一题</p>
+                <h2>限时模式</h2>
+                <p>限时反应后显示答案并自动进入下一题</p>
               </div>
               <label class="switch">
                 <input id="autoRevealToggle" type="checkbox" />
                 <span class="switch-track"><span class="switch-thumb"></span></span>
-                <span class="sr-only">开启自动模式</span>
+                <span class="sr-only">开启限时模式</span>
               </label>
             </div>
             <div class="setting-row" id="autoRevealSetting">
               <div class="speed-line">
-                <label for="autoRevealAtSeconds">显示秒</label>
+                <label for="autoRevealAtSeconds">限时反应</label>
                 <div class="number-field">
-                  <button type="button" data-step-target="autoRevealAtSeconds" data-step="-1" aria-label="减少显示秒数">−</button>
-                  <input id="autoRevealAtSeconds" type="number" value="5" min="1" max="60" step="1" inputmode="numeric" aria-label="答案显示秒数" />
+                  <button type="button" data-step-target="autoRevealAtSeconds" data-step="-1" aria-label="减少限时反应秒数">−</button>
+                  <input id="autoRevealAtSeconds" type="number" value="5" min="1" max="60" step="1" inputmode="numeric" aria-label="限时反应秒数" />
                   <span>秒</span>
-                  <button type="button" data-step-target="autoRevealAtSeconds" data-step="1" aria-label="增加显示秒数">＋</button>
+                  <button type="button" data-step-target="autoRevealAtSeconds" data-step="1" aria-label="增加限时反应秒数">＋</button>
                 </div>
               </div>
               <div class="speed-line">
