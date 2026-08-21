@@ -1,0 +1,233 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#fef3f2" />
+    <title>GUITAR 音阶练习</title>
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect x='1' y='1' width='30' height='30' rx='7' fill='%23fef3f2' stroke='%23cdd3e0' stroke-width='2'/%3E%3Ctext x='16' y='23' text-anchor='middle' font-family='Arial' font-weight='bold' font-size='20' fill='%236fa8c4'%3ES%3C/text%3E%3C/svg%3E" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="chord-styles.css?v=11" />
+    <link rel="stylesheet" href="scale-styles.css?v=1" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <header class="topbar reveal fade-in">
+        <a class="brand" href="scales.html" aria-label="音阶练习首页">
+          <span class="brand-mark" aria-hidden="true">S</span>
+          <span>
+            <strong>GUITAR 音阶练习</strong>
+            <small>Guitar Z出品</small>
+          </span>
+        </a>
+        <nav class="tool-nav tabs" aria-label="工具导航">
+          <a class="tool-tab" href="index.html">指板练习</a>
+          <a class="tool-tab" href="chords.html">和弦速查</a>
+          <a class="tool-tab active" href="scales.html" aria-current="page">音阶练习</a>
+        </nav>
+      </header>
+
+      <!-- 三栏布局：左控制 → 中主区 → 右音阶选择 -->
+      <div class="chords-layout">
+        <!-- 左栏：调音与把位 + 显示选项 -->
+        <aside class="layout-left reveal" aria-label="设置">
+          <article class="control-card brutal-shadow">
+            <div class="control-title-row">
+              <div class="control-icon" aria-hidden="true">♮</div>
+              <div>
+                <h2>调音与把位</h2>
+                <p>调音标准与升降记号</p>
+              </div>
+            </div>
+            <div class="setting-block">
+              <label class="setting-label" for="tuningSelect">调音标准</label>
+              <div class="clay-select-wrap">
+                <select id="tuningSelect" class="clay-select" aria-label="调音标准">
+                  <option value="standard">标准调弦 EADGBE</option>
+                  <option value="dropD">Drop D · DADGBE</option>
+                  <option value="dadgad">DADGAD</option>
+                  <option value="openG">Open G · DGDGBD</option>
+                  <option value="openD">Open D · DADF♯AD</option>
+                  <option value="eb">半音降调 · E♭A♭D♭G♭B♭E♭</option>
+                </select>
+              </div>
+              <p class="tuning-desc" id="tuningDesc">E A D G B E，最常用的标准定弦。</p>
+            </div>
+            <div class="setting-block">
+              <span class="setting-label">升降记号</span>
+              <div class="segmented" id="accidentalSwitch" role="group" aria-label="升降记号">
+                <button type="button" data-acc="sharp" class="active" aria-pressed="true">升号 ♯</button>
+                <button type="button" data-acc="flat" aria-pressed="false">降号 ♭</button>
+              </div>
+            </div>
+          </article>
+
+          <article class="control-card brutal-shadow">
+            <div class="control-title-row">
+              <div class="control-icon" aria-hidden="true">⚙</div>
+              <div>
+                <h2>显示选项</h2>
+                <p>指板范围与播放设置</p>
+              </div>
+            </div>
+            <div class="setting-block">
+              <span class="setting-label">指板范围</span>
+              <div class="segmented" id="rangeSwitch" role="group" aria-label="指板品位范围">
+                <button type="button" data-range="12" class="active" aria-pressed="true">0–12 品</button>
+                <button type="button" data-range="22" aria-pressed="false">0–22 品</button>
+              </div>
+            </div>
+            <div class="setting-block">
+              <span class="setting-label">音阶跨度</span>
+              <div class="segmented" id="octaveSwitch" role="group" aria-label="播放音阶跨度">
+                <button type="button" data-oct="1" class="active" aria-pressed="true">1 个八度</button>
+                <button type="button" data-oct="2" aria-pressed="false">2 个八度</button>
+              </div>
+            </div>
+            <div class="setting-block">
+              <span class="setting-label">播放速度</span>
+              <div class="segmented" id="tempoSwitch" role="group" aria-label="播放速度">
+                <button type="button" data-tempo="620" aria-pressed="false">慢</button>
+                <button type="button" data-tempo="380" class="active" aria-pressed="true">中</button>
+                <button type="button" data-tempo="240" aria-pressed="false">快</button>
+              </div>
+            </div>
+          </article>
+        </aside>
+
+        <!-- 主栏：当前音阶 + 指板 + 顺阶和弦 -->
+        <div class="layout-main">
+          <!-- 当前音阶主视觉 -->
+          <section class="hero-card reveal fade-in brutal-shadow-lg" aria-labelledby="scale-name">
+            <div class="hero-orbs" aria-hidden="true">
+              <span class="orb orb-1"></span>
+              <span class="orb orb-2"></span>
+              <span class="orb orb-3"></span>
+            </div>
+            <p class="eyebrow reveal fade-in stagger-1"><span class="pulse-dot"></span>当前音阶</p>
+            <div class="chord-name-card scale-in stagger-2" aria-live="polite">
+              <span id="scaleName">C 大调音阶</span>
+              <small id="scaleEn">Major (Ionian)</small>
+            </div>
+            <div class="chord-info">
+              <div class="tone-chips" id="noteChips" aria-label="音阶音名"></div>
+              <div class="interval-chips" id="degreeChips" aria-label="音阶级数"></div>
+            </div>
+            <p class="theory-desc" id="theoryDesc"></p>
+          </section>
+
+          <!-- 指板图 -->
+          <section class="fretboard-section brutal-shadow reveal" aria-labelledby="scale-fretboard-title">
+            <div class="section-heading">
+              <div>
+                <p class="section-kicker" id="fbKicker">指板位置</p>
+                <h1 id="scale-fretboard-title">音阶在指板上的分布</h1>
+              </div>
+              <div class="scale-actions">
+                <button class="play-btn brutal-shadow brutal-shadow-hover" id="playButton" type="button" aria-label="播放音阶">
+                  <span class="play-icon" aria-hidden="true">▶</span>
+                  <span class="play-label">播放音阶</span>
+                </button>
+                <div class="fretboard-label-switch">
+                  <span class="fretboard-label-title">标注</span>
+                  <div class="segmented" id="labelSwitch" role="group" aria-label="指板标注方式">
+                    <button type="button" data-label="note" class="active" aria-pressed="true">音名</button>
+                    <button type="button" data-label="degree" aria-pressed="false">级数</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="fretboard-scroll" id="fretboardScroll" tabindex="0" aria-label="吉他指板，可横向滚动，点击任意位置发声">
+              <div class="fretboard-wrap">
+                <div class="fret-numbers" id="fretNumbers"></div>
+                <div class="fretboard" id="scaleFretboard"></div>
+              </div>
+            </div>
+            <div class="legend" aria-hidden="true">
+              <span class="legend-root">根音</span>
+              <span class="legend-tone">音阶音</span>
+              <span>点击指板任意位置可发声</span>
+              <span>点击下方和弦可在指板高亮其组成音</span>
+            </div>
+            <p class="fretboard-hint"><span class="hint-line"></span> 从上到下为 E、B、G、D、A、E 弦，含空弦与所选品位范围。</p>
+          </section>
+
+          <!-- 顺阶和弦 -->
+          <section class="fretboard-section diatonic-section brutal-shadow reveal" aria-labelledby="diatonic-title">
+            <div class="section-heading">
+              <div>
+                <p class="section-kicker">顺阶和弦</p>
+                <h1 id="diatonic-title">该音阶上的和弦</h1>
+              </div>
+              <div class="answer-status" id="diatonicHint" aria-live="polite">
+                <span aria-hidden="true">●</span>
+                <span id="diatonicHintText">点击和弦可高亮组成音</span>
+              </div>
+            </div>
+
+            <div class="diatonic-block">
+              <h2 class="diatonic-subtitle">顺阶三和弦</h2>
+              <div class="diatonic-grid" id="triadGrid" aria-label="顺阶三和弦"></div>
+            </div>
+            <div class="diatonic-block">
+              <h2 class="diatonic-subtitle">顺阶七和弦</h2>
+              <div class="diatonic-grid" id="seventhGrid" aria-label="顺阶七和弦"></div>
+            </div>
+          </section>
+        </div>
+
+        <!-- 右栏：音阶选择（根音 × 音阶类型） -->
+        <aside class="layout-right reveal" aria-label="音阶选择">
+          <article class="control-card chords-list-card brutal-shadow">
+            <div class="control-title-row">
+              <div class="control-icon" aria-hidden="true">♪</div>
+              <div>
+                <h2>音阶选择</h2>
+                <p>根音 × 音阶类型</p>
+              </div>
+            </div>
+            <div class="selector-block">
+              <span class="selector-label">根音</span>
+              <div class="root-buttons" id="rootButtons" role="group" aria-label="根音选择"></div>
+            </div>
+            <div class="selector-block">
+              <span class="selector-label">音阶类型</span>
+              <div class="type-groups" id="scaleGroups"></div>
+            </div>
+          </article>
+        </aside>
+      </div>
+
+      <footer class="reveal fade-in">
+        <span>提示</span>
+        指板按弦点可点击发声，播放按钮按音阶顺序升调演示，点击顺阶和弦可在指板高亮其组成音。
+      </footer>
+    </main>
+
+    <script src="chord-engine.js?v=3"></script>
+    <script src="scale-app.js?v=1"></script>
+    <script>
+      // 滚动触发入场动画：进入视口时添加 .in-view（播放一次）
+      (function () {
+        var nodes = document.querySelectorAll('.reveal');
+        var reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        if (reduce || !('IntersectionObserver' in window)) {
+          nodes.forEach(function (el) { el.classList.add('in-view'); });
+          return;
+        }
+        var io = new IntersectionObserver(function (entries) {
+          entries.forEach(function (entry) {
+            if (entry.isIntersecting) {
+              entry.target.classList.add('in-view');
+              io.unobserve(entry.target);
+            }
+          });
+        }, { threshold: 0.12, rootMargin: '0px 0px -6% 0px' });
+        nodes.forEach(function (el) { io.observe(el); });
+      })();
+    </script>
+  </body>
+</html>
