@@ -39,6 +39,115 @@ function loadState() {
 
 const state = loadState();
 
+/* ---------------- 音频：Web Audio API + Karplus-Strong 合成原声吉他音色 ---------------- */
+const TUNING_BASE_MIDI = {
+  standard: [40, 45, 50, 55, 59, 64], // 6弦..1弦 (EADGBE)
+  dropD:    [38, 45, 50, 55, 59, 64],
+  dadgad:   [38, 45, 50, 55, 57, 64],
+  openG:    [38, 43, 50, 55, 59, 62],
+  openD:    [38, 45, 50, 54, 57, 62],
+  eb:       [39, 44, 49, 54, 58, 63],
+};
+
+function midiToFreq(midi) {
+  return 440 * Math.pow(2, (midi - 69) / 12);
+}
+
+const guitarAudio = {
+  ctx: null,
+  ensure() {
+    if (!this.ctx) {
+      this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+    }
+    if (this.ctx.state === "suspended") {
+      this.ctx.resume();
+    }
+  },
+  play(midi, velocity = 1) {
+    this.ensure();
+    const ctx = this.ctx;
+    const t = ctx.currentTime;
+    const freq = midiToFreq(midi);
+    const duration = 2.6;
+
+    // Karplus-Strong 激励噪声
+    const samples = Math.max(1, Math.floor(ctx.sampleRate / freq));
+    const buf = ctx.createBuffer(1, samples, ctx.sampleRate);
+    const data = buf.getChannelData(0);
+    for (let i = 0; i < samples; i += 1) {
+      data[i] = Math.random() * 2 - 1;
+    }
+    const src = ctx.createBufferSource();
+    src.buffer = buf;
+
+    const excite = ctx.createGain();
+    excite.gain.value = 0.55;
+
+    const delay = ctx.createDelay(1.0);
+    delay.delayTime.value = 1 / freq;
+
+    const filter = ctx.createBiquadFilter();
+    filter.type = "lowpass";
+    filter.frequency.value = Math.min(7500, freq * 3.5);
+    filter.Q.value = 0.35;
+
+    // 琴体共鸣
+    const body = ctx.createBiquadFilter();
+    body.type = "bandpass";
+    body.frequency.value = Math.max(120, Math.min(360, freq * 0.35));
+    body.Q.value = 1.8;
+
+    const output = ctx.createGain();
+    output.gain.setValueAtTime(0, t);
+    output.gain.linearRampToValueAtTime(0.38 * velocity, t + 0.004);
+    output.gain.exponentialRampToValueAtTime(0.0001, t + duration);
+
+    src.connect(excite);
+    excite.connect(delay);
+    delay.connect(filter);
+    filter.connect(delay); // 反馈回路
+    delay.connect(body);
+    body.connect(output);
+    output.connect(ctx.destination);
+
+    src.start(t);
+    src.stop(t + samples / ctx.sampleRate);
+
+    setTimeout(() => {
+      try {
+        src.disconnect();
+        excite.disconnect();
+        delay.disconnect();
+        filter.disconnect();
+        body.disconnect();
+        output.disconnect();
+      } catch {}
+    }, (duration + 0.25) * 1000);
+  },
+};
+
+function fretFromX(x, start, leftPad, colW, end) {
+  const f = Math.round((x - leftPad - colW / 2) / colW) + start;
+  return Math.max(start, Math.min(end, f));
+}
+
+function showFretHit(svg, si, fret, start, leftPad, colW, rowH, padT) {
+  const order = [5, 4, 3, 2, 1, 0];
+  const row = order.indexOf(si);
+  const x = leftPad + (fret - start) * colW + colW / 2;
+  const y = padT + row * rowH + rowH / 2;
+  const circle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+  circle.setAttribute("cx", x);
+  circle.setAttribute("cy", y);
+  circle.setAttribute("r", 8);
+  circle.setAttribute("fill", "none");
+  circle.setAttribute("stroke", "rgba(245,166,156,0.85)");
+  circle.setAttribute("stroke-width", 3);
+  circle.setAttribute("class", "fb-hit-ring");
+  svg.appendChild(circle);
+  setTimeout(() => circle.remove(), 340);
+}
+
 const elements = {
   chordSymbol: document.querySelector("#chordSymbol"),
   chordCn: document.querySelector("#chordCn"),
@@ -365,6 +474,12 @@ function buildFullFretboardSVG(type, tuning, opts = {}) {
     }
   });
 
+  // 透明点击条：覆盖每根弦的完整横向区域，点击后按 x 坐标计算品位并播放音高
+  order.forEach((si, row) => {
+    const y = pad.t + row * rowH;
+    parts.push(`<rect class="fb-string-strip" x="0" y="${y}" width="${w}" height="${rowH}" fill="transparent" data-si="${si}" data-start="${start}" data-end="${end}" data-left-pad="${leftPad}" data-col-w="${colW}" data-row-h="${rowH}" data-pad-t="${pad.t}" aria-label="弦 ${6 - si} 点击区"/>`);
+  });
+
   parts.push("</svg>");
   return parts.join("\n");
 }
@@ -515,7 +630,7 @@ function renderVoicings() {
     elements.voicingHint.classList.add("visible");
     elements.voicingHintText.textContent = "0–12 品（右滑加载 13–24）";
     elements.diagramHint.innerHTML =
-      `<span class="hint-line"></span> 深蓝为根音，桃色为和弦构成音，可横向滚动查看更高把位。`;
+      `<span class="hint-line"></span> 深蓝为根音，桃色为和弦构成音；点击指板任意品格即可听到对应音高。`;
   }
 }
 
@@ -618,6 +733,29 @@ elements.fretboardArea.addEventListener("click", (e) => {
   const btn = e.target.closest("button[data-fb-label]");
   if (!btn) return;
   updateFretboardLabelMode(btn.dataset.fbLabel);
+});
+
+// 指板点击发声——事件委托，兼容动态加载的高把位 SVG
+elements.fretboardArea.addEventListener("click", (e) => {
+  const strip = e.target.closest(".fb-string-strip");
+  if (!strip) return;
+  const svg = strip.closest("svg");
+  if (!svg) return;
+
+  guitarAudio.ensure();
+
+  const si = Number(strip.dataset.si);
+  const start = Number(strip.dataset.start);
+  const end = Number(strip.dataset.end);
+  const leftPad = Number(strip.dataset.leftPad);
+  const colW = Number(strip.dataset.colW);
+  const rowH = Number(strip.dataset.rowH);
+  const padT = Number(strip.dataset.padT);
+
+  const fret = fretFromX(e.offsetX, start, leftPad, colW, end);
+  const midi = TUNING_BASE_MIDI[state.tuningId][si] + fret;
+  guitarAudio.play(midi);
+  showFretHit(svg, si, fret, start, leftPad, colW, rowH, padT);
 });
 
 /* ---------------- 初始化 ---------------- */

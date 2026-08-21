@@ -860,6 +860,15 @@ button { color: inherit; cursor: pointer; }
 .fretboard-label-switch .segmented button { padding: 5px 12px; }
 .diagram-fb-label { font-family: var(--font); font-size: 10px; font-weight: 800; fill: var(--tone-ink); }
 
+/* 指板点击发声交互 */
+.fb-string-strip { cursor: pointer; }
+.fb-string-strip:hover { fill: rgba(79, 143, 176, 0.07); }
+.fb-hit-ring { pointer-events: none; animation: fb-hit-pulse 340ms ease-out forwards; }
+@keyframes fb-hit-pulse {
+  0% { r: 8; opacity: 1; stroke-width: 3; }
+  100% { r: 28; opacity: 0; stroke-width: 0; }
+}
+
 /* 图例 */
 .legend {
   display: flex;
