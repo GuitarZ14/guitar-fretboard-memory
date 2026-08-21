@@ -119,7 +119,7 @@ function check(name, cond, detail) {
   const midi3 = await page.evaluate(() => window.__lastPlayedMidi);
   check('点击 6 弦 3 品播放 G2 (MIDI 43)', midi3 === 43, 'lastMidi=' + midi3);
 
-  console.log('\n[采样模式切换与发声]');
+  console.log('\n[采样模式切换与真实采样路由]');
   // 切换到采样模式
   await page.click('#toneSwitch button[data-tone="sample"]');
   await page.waitForTimeout(300);
@@ -134,22 +134,58 @@ function check(name, cond, detail) {
   const sampleMidi = await page.evaluate(() => window.__lastPlayedMidi);
   check('采样模式点击 6 弦左侧仍播放 E2 (MIDI 40)', sampleMidi === 40, 'lastMidi=' + sampleMidi);
 
-  // 验证确实发起了采样文件请求（offline samples/E2.wav）
-  const sampleReq = await page.evaluate(async () => {
-    try {
-      const r = await fetch('samples/' + (PITCH_SHARP[((TUNING_BASE_MIDI[state.tuningId][0]) % 12 + 12) % 12] + (Math.floor(TUNING_BASE_MIDI[state.tuningId][0] / 12) - 1) + '.wav'));
-      return r.ok;
-    } catch (e) { return false; }
+  // pickSample 音高映射：6 弦空弦(MIDI40/E2) → wavebase 的 string-6 fret-02（录音为 Drop-D，空弦=D2，故 E2 在 2 品）
+  const pick = await page.evaluate(() => {
+    const p = audioEngine.pickSample(0, 0, 'standard');
+    return p ? { N: p.N, fret: p.fret, token: p.token, take: p.take, targetMidi: p.targetMidi } : null;
   });
-  check('采样文件可加载（samples/E2.wav 可访问）', sampleReq === true, 'ok=' + sampleReq);
+  check('pickSample(6弦,0品) 命中真实采样', pick !== null, JSON.stringify(pick));
+  check('6 弦空弦 E2 命中 wavebase string-6（同物理低音弦）', pick && pick.N === 6, JSON.stringify(pick));
+  // 该录音在 wavebase 中以异名同音记法 "Dx2"（D 重升 = E2）存储，按音高校验更准确
+  check('真实采样音高 = E2 (MIDI 40)', pick && pick.targetMidi === 40, JSON.stringify(pick));
+  check('每次点击选定一个具体 take 编号', pick && pick.take >= 1, JSON.stringify(pick));
 
-  // 验证采样被解码为 AudioBuffer（decodeAudioData 成功）
-  const decoded = await page.evaluate(async () => {
-    await audioEngine.loadSample(0);
-    const buf = audioEngine.buffers[0];
-    return buf ? { ok: true, duration: buf.duration, sr: buf.sampleRate } : { ok: false };
+  // 构造真实采样 URL 并校验格式（指向 wavebase CDN，绝不含 playbackRate 思路）
+  const url = await page.evaluate(() => {
+    const p = audioEngine.pickSample(0, 0, 'standard');
+    return audioEngine.sampleUrl(p.N, p.fret, p.token, 1);
   });
-  check('采样被解码为 AudioBuffer（decodeAudioData 成功）', decoded.ok && decoded.duration > 1, JSON.stringify(decoded));
+  check('采样 URL 指向真实录音 CDN（media.githubusercontent / parker-fly / string-6）',
+    /media\.githubusercontent\.com\/media\/cluesurf\/wavebase.*parker-fly\/string-6\/string-6-note-.+-fret-\d+-1\.wav$/.test(url),
+    url);
+
+  // 用 fetch 桩拦截 CDN 请求（避免依赖外网），返回一段合法 WAV，验证解码与路由
+  // 先清空缓存并指定固定 take，确保本次请求被桩捕获（不命中前序真实点击的缓存）
+  const decoded = await page.evaluate(async () => {
+    audioEngine.buffers = Object.create(null);
+    audioEngine.loading = Object.create(null);
+    function makeWav(freq, dur) {
+      const sr = 44100, n = Math.floor(sr * dur);
+      const buf = new ArrayBuffer(44 + n * 2);
+      const v = new DataView(buf);
+      const ws = (o, s) => { for (let i = 0; i < s.length; i++) v.setUint8(o + i, s.charCodeAt(i)); };
+      ws(0, 'RIFF'); v.setUint32(4, 36 + n * 2, true); ws(8, 'WAVE'); ws(12, 'fmt ');
+      v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true);
+      v.setUint32(24, sr, true); v.setUint32(28, sr * 2, true); v.setUint16(32, 2, true); v.setUint16(34, 16, true);
+      ws(36, 'data'); v.setUint32(40, n * 2, true);
+      for (let i = 0; i < n; i++) v.setInt16(44 + i * 2, Math.sin(i / sr * freq * 2 * Math.PI) * 30000, true);
+      return buf;
+    }
+    let requested = null;
+    const origFetch = window.fetch.bind(window);
+    window.fetch = (u) => {
+      requested = typeof u === 'string' ? u : u.url;
+      return Promise.resolve(new Response(makeWav(330, 0.2), { status: 200, headers: { 'Content-Type': 'audio/wav' } }));
+    };
+    // 指定 (N=6, fret=1, token=Dx2, take=3)：与 6 弦空弦 E2 对应的真实录音
+    const buf = await audioEngine.loadSampleBuffer(6, 1, 'Dx2', 3);
+    window.fetch = origFetch;
+    return buf ? { ok: true, duration: buf.duration, sr: buf.sampleRate, requested } : { ok: false, requested };
+  });
+  check('真实采样被解码为 AudioBuffer（decodeAudioData 成功）', decoded.ok && decoded.duration > 0.05, JSON.stringify(decoded));
+  check('采样加载确实请求了真实录音 URL',
+    decoded.requested && /parker-fly\/string-6\/string-6-note-Dx2-fret-01-3\.wav$/.test(decoded.requested),
+    JSON.stringify(decoded));
 
   // 切回合成模式，避免影响后续用例
   await page.click('#toneSwitch button[data-tone="synth"]');
@@ -178,7 +214,7 @@ function check(name, cond, detail) {
   check('高把位段 SVG 中存在 6 根点击条', highInfo.stripCount === 6, 'count=' + highInfo.stripCount);
   check('高把位段 start=13 / end=24', highInfo.firstStart === '13' && highInfo.firstEnd === '24', JSON.stringify(highInfo));
 
-  // 点击高把位段 1 弦 13 品：标准调弦 1 弦空弦 E4 = MIDI 64，+13 = F#5 = 77
+  // 点击高把位段 1 弦 13 品：标准调弦 1 弦空弦 E4 = MIDI 64，+13 = F5 = 77
   const highStrip = await page.$('#fretboardPartHigh .fb-string-strip[data-si="5"]');
   if (highStrip) {
     const highBox = await highStrip.evaluate((el) => {
