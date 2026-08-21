@@ -885,11 +885,15 @@ button { color: inherit; cursor: pointer; }
   100% { background: transparent; }
 }
 
-/* 练习模式：点中的正确格子高亮 */
+/* 练习模式：点中的正确格子高亮，并仅在该格子内显示答案圆点（不暴露其他弦答案） */
 .fret-cell.hit .answer-note {
   outline: 3px solid #fff;
   outline-offset: 1px;
   box-shadow: 0 0 0 4px rgba(47, 164, 90, 0.5);
+}
+.fret-cell.hit .answer-note.match {
+  opacity: 1;
+  transform: scale(1);
 }
 
 /* 真实品点标记（已写入 app.js，置于指板格子内） */

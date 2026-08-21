@@ -273,14 +273,15 @@ function saveFretRange(range) {
 
 // 练习难度：用户可单独或组合勾选琴弦（1-6）。
 // 进入点按模式默认「单选一弦」——初始仅点亮默认弦（DEFAULT_STRING），用户可直接点按；
-// 之后可在模式内点弦按钮切换为其他弦或追加多选。
-// 历史存储仅恢复「单弦」选择；多弦/全选视为旧版默认或误操作，回落到默认单选一弦，
-// 以保证每次进入点按模式初始状态都是单选一弦。
+// 之后可在模式内点弦按钮切换为其他弦或追加多选，选择会持久化。
 function loadStrings() {
   try {
     const saved = JSON.parse(localStorage.getItem(STRING_STORAGE_KEY));
-    if (Array.isArray(saved) && saved.length === 1 && ALL_STRINGS.includes(Number(saved[0]))) {
-      return [Number(saved[0])];
+    if (Array.isArray(saved)) {
+      const valid = saved
+        .map((n) => Number(n))
+        .filter((n) => ALL_STRINGS.includes(n));
+      if (valid.length > 0) return valid;
     }
   } catch {
     // fall back to default
@@ -355,6 +356,8 @@ const state = {
     wrongInQuestion: 0,
     phase: "pending", // pending | done
     firstClick: true,
+    targetStrings: new Set(), // 当前题需要点击的弦（仅含在品格区间内有答案的选中弦）
+    foundStrings: new Set(),  // 当前题已正确点击的弦
     advanceTimer: null,
     lastAdvanceAt: 0, // drawNextNote 防重入去抖时间戳
   },
@@ -593,6 +596,20 @@ function updateStats() {
   elements.statBest.textContent = `${getBestForDifficulty()}%`;
 }
 
+/* 当前题需要在「选中弦组 + 品格区间」内逐一找出的弦集合（1-based string index）。
+   只包含有目标音高的弦；没有该音的选中弦不强制点击。 */
+function getTargetStrings(note = ensureValidNote()) {
+  const { min, max } = state.practice.fretRange;
+  const indices = state.practice.strings.filter((stringIndex) => {
+    const pitch = STRINGS[stringIndex - 1].pitch;
+    for (let fret = min; fret <= max; fret += 1) {
+      if (CHROMATIC[(pitch + fret) % 12] === note.pitch) return true;
+    }
+    return false;
+  });
+  return new Set(indices);
+}
+
 function updateDimmedCells() {
   const practice = state.mode === "practice";
   const { min, max } = practice ? state.practice.fretRange : { min: MIN_FRET, max: MAX_FRET };
@@ -620,9 +637,16 @@ function startQuestion() {
   state.practice.phase = "pending";
   state.practice.firstClick = true;
   state.practice.wrongInQuestion = 0;
+  state.practice.foundStrings = new Set();
+  state.practice.targetStrings = getTargetStrings();
   clearCellFeedback();
   setAnswerVisible(false);
-  setAnswerStatus(`在指板上找出 ${ensureValidNote().display} 的位置`);
+  const note = ensureValidNote();
+  const targetCount = state.practice.targetStrings.size;
+  const status = targetCount > 1
+    ? `在指板上找出 ${note.display} 的位置（需找 ${targetCount} 根弦）`
+    : `在指板上找出 ${note.display} 的位置`;
+  setAnswerStatus(status);
   updateStats();
 }
 
@@ -646,20 +670,50 @@ function onCellClick(cell) {
   }
 
   const note = ensureValidNote();
+  const stringIndex = Number(cell.dataset.stringIndex);
 
   if (cell.dataset.pitch === note.pitch) {
     cell.blur();
-    state.practice.completed += 1;
-    state.practice.phase = "done";
-    if (state.practice.firstClick) state.practice.firstTry += 1;
-    const suffix = state.practice.wrongInQuestion > 0
-      ? `（本题先错过 ${state.practice.wrongInQuestion} 次）`
-      : "";
-    setAnswerVisible(true, `答对了！已显示 ${note.display} 的位置${suffix}`);
+
+    // 正确音高但不在当前题目要求的弦上（理论上已被 dimmed 屏蔽点击，兜底处理）
+    if (!state.practice.targetStrings.has(stringIndex)) {
+      state.practice.firstClick = false;
+      state.practice.wrongInQuestion += 1;
+      state.practice.wrongClicks += 1;
+      cell.classList.remove("miss");
+      void cell.offsetWidth;
+      cell.classList.add("miss");
+      setAnswerStatus("不对，这条弦不在当前练习范围内");
+      setTimeout(() => cell.classList.remove("miss"), 640);
+      return;
+    }
+
+    // 同一弦重复点击不重复计数
+    if (state.practice.foundStrings.has(stringIndex)) {
+      setAnswerStatus("这根弦已经找过了，继续找其他弦");
+      return;
+    }
+
+    state.practice.foundStrings.add(stringIndex);
     cell.classList.add("hit");
-    updateStats();
-    clearTimeout(state.practice.advanceTimer);
-    state.practice.advanceTimer = setTimeout(() => newRound(), 1500);
+    const found = state.practice.foundStrings.size;
+    const total = state.practice.targetStrings.size;
+
+    if (found === total) {
+      state.practice.completed += 1;
+      state.practice.phase = "done";
+      if (state.practice.firstClick) state.practice.firstTry += 1;
+      const suffix = state.practice.wrongInQuestion > 0
+        ? `（本题先错过 ${state.practice.wrongInQuestion} 次）`
+        : "";
+      setAnswerVisible(true, `全部找齐！${note.display} 的位置${suffix}`);
+      updateStats();
+      clearTimeout(state.practice.advanceTimer);
+      state.practice.advanceTimer = setTimeout(() => newRound(), 1500);
+    } else {
+      setAnswerStatus(`已找到 ${found}/${total} 根弦，继续找 ${note.display}`);
+      updateStats();
+    }
   } else {
     cell.blur();
     state.practice.firstClick = false;
@@ -835,7 +889,7 @@ function setMode(mode) {
   elements.practiceStats.hidden = mode !== "practice";
   elements.instruction.textContent =
     mode === "practice"
-      ? "点击指板上对应位置作答，答完自动进入下一题。"
+      ? "点按模式下需逐一点按每根选中弦上的目标音，全部找齐后自动进入下一题。"
       : "在吉他上弹出这个音的任意位置，然后查看答案。";
   elements.sectionKicker.textContent = mode === "practice" ? "点按区域" : "查看区域";
 
