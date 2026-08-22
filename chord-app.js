@@ -44,6 +44,84 @@ const state = loadState();
 let pickedNotes = new Set();          // pitch class 集合（0-11）
 let pickedPositions = [];              // {si, fret, pc}
 
+// 探索模式 → 详情模式 过渡状态：用户点击匹配卡片时设置，渲染详情首卡。
+// detailVoicing  非空时，详情页顶部显示「探索模式推荐」按法图，并高亮用户已选位置。
+// detailPickMap Set<"si:fret">，用于 buildVoicingSVG 视觉对齐。
+// 不参与持久化（session 关闭即清空）。
+let detailVoicing = null;
+let detailPickMap = null;
+
+const PICKER_BACKUP_KEY = "gcfm-explorer-backup";
+
+function savePickedBackup() {
+  try {
+    sessionStorage.setItem(PICKER_BACKUP_KEY, JSON.stringify({
+      root: state.root,
+      typeId: state.typeId,
+      tuningId: state.tuningId,
+      accidental: state.accidental,
+      handed: state.handed,
+      fbLabelMode: state.fbLabelMode,
+      pickedNotes: [...pickedNotes],
+      pickedPositions,
+    }));
+  } catch {
+    // 忽略（隐私模式可能不可用）
+  }
+}
+
+function clearPickedBackup() {
+  try {
+    sessionStorage.removeItem(PICKER_BACKUP_KEY);
+  } catch {
+    // 忽略
+  }
+}
+
+// 入口：从探索模式匹配卡片点击进入该和弦的详情视图
+function enterChordDetail(match, v) {
+  savePickedBackup();
+  detailVoicing = {
+    root: match.root,
+    typeId: match.typeId,
+    voicing: v,
+    pickedSet: [...pickedNotes].sort((a, b) => a - b),
+  };
+  detailPickMap = new Set(pickedPositions.map((p) => `${p.si}:${p.fret}`));
+  state.root = match.root;
+  state.typeId = match.typeId;
+  state.view = "voicing";
+  renderAll();
+}
+
+// 返回探索模式：从备份恢复已选音、视图与控制状态
+function returnToExplorer() {
+  let backup = null;
+  try {
+    const raw = sessionStorage.getItem(PICKER_BACKUP_KEY);
+    if (raw) backup = JSON.parse(raw);
+  } catch {
+    backup = null;
+  }
+  if (backup) {
+    pickedNotes = new Set(backup.pickedNotes || []);
+    pickedPositions = Array.isArray(backup.pickedPositions) ? backup.pickedPositions : [];
+    if (Number.isFinite(backup.root)) state.root = backup.root % 12;
+    if (CHORD_TYPE_MAP[backup.typeId]) state.typeId = backup.typeId;
+    if (TUNINGS[backup.tuningId]) state.tuningId = backup.tuningId;
+    state.accidental = backup.accidental === "flat" ? "flat" : "sharp";
+    state.handed = backup.handed === "left" ? "left" : "right";
+    state.fbLabelMode = backup.fbLabelMode === "note" ? "note" : "degree";
+  }
+  detailVoicing = null;
+  detailPickMap = null;
+  state.view = "fretboard";
+  clearPickedBackup();
+  renderAll();
+}
+
+/* ---------------- 音频：Karplus-Strong 合成引擎 ---------------- */
+
 /* ---------------- 音频：Karplus-Strong 合成引擎 ---------------- */
 const TUNING_BASE_MIDI = {
   standard: [40, 45, 50, 55, 59, 64], // 6弦..1弦 (EADGBE)
@@ -313,6 +391,7 @@ const DIAGRAM_COLORS = {
   nut: "#8a8aa0",
   root: "#4f8fb0",
   tone: "#f5a69c",
+  pickRing: "#f1c40f", // 探索模式高亮：用户已选音对应的按弦位置
 };
 
 // 琴弦线宽：si=0（1弦/高音E，最细）→ si=5（6弦/低音E，最粗），相邻自然递减
@@ -320,7 +399,7 @@ function stringWidth(si, thin, thick) {
   return +(thin + (si / 5) * (thick - thin)).toFixed(2);
 }
 
-function buildVoicingSVG(v, type, tuning) {
+function buildVoicingSVG(v, type, tuning, opts = {}) {
   const frets = v.frets;
   const base = v.baseFret;
   const start = base <= 1 ? 0 : base - 1;
@@ -332,6 +411,8 @@ function buildVoicingSVG(v, type, tuning) {
   const order = state.handed === "left" ? [5, 4, 3, 2, 1, 0] : [0, 1, 2, 3, 4, 5];
   const w = pad.l + colW * 6 + pad.r;
   const h = pad.t + rows * rowH + pad.b;
+  // 探索模式高亮：传入 highlightSet（Set<"si:fret">），命中处画黄色环
+  const highlightSet = opts.highlightSet instanceof Set ? opts.highlightSet : null;
 
   const parts = [];
   parts.push(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}" role="img" aria-label="和弦指法图">`);
@@ -385,20 +466,33 @@ function buildVoicingSVG(v, type, tuning) {
   order.forEach((si, col) => {
     const x = pad.l + col * colW + colW / 2;
     const f = frets[si];
+    const isPicked = !!(highlightSet && highlightSet.has(`${si}:${f}`));
     if (f === -1) {
       parts.push(`<text class="diagram-mute" x="${x}" y="${pad.t - 7}" text-anchor="middle">×</text>`);
       return;
     }
     if (f === 0) {
       parts.push(`<text class="diagram-open" x="${x}" y="${pad.t - 7}" text-anchor="middle">○</text>`);
+      if (isPicked) {
+        // 探索模式高亮：空弦位置用黄色环标记
+        parts.push(
+          `<circle class="diagram-pick-ring" cx="${x}" cy="${pad.t - 7}" r="7" fill="none" stroke="${DIAGRAM_COLORS.pickRing}" stroke-width="2" stroke-dasharray="2 1.6"/>`
+        );
+      }
       return;
     }
     const y = pad.t + (f - start) * rowH + rowH / 2;
     const isRoot = v.rootStrings.includes(si);
     const fill = isRoot ? DIAGRAM_COLORS.root : DIAGRAM_COLORS.tone;
+    const r = isPicked ? 8 : 6;
     parts.push(
-      `<circle cx="${x}" cy="${y}" r="6" fill="${fill}" stroke="rgba(255,255,255,0.9)" stroke-width="1.5"/>`
+      `<circle cx="${x}" cy="${y}" r="${r}" fill="${fill}" stroke="rgba(255,255,255,0.9)" stroke-width="1.5"/>`
     );
+    if (isPicked) {
+      parts.push(
+        `<circle class="diagram-pick-ring" cx="${x}" cy="${y}" r="${r + 4}" fill="none" stroke="${DIAGRAM_COLORS.pickRing}" stroke-width="2" stroke-dasharray="2 1.6"/>`
+      );
+    }
     if (isRoot) {
       parts.push(`<text class="diagram-root" x="${x}" y="${y + 1}" text-anchor="middle" dominant-baseline="central">R</text>`);
     } else {
@@ -655,10 +749,33 @@ function renderVoicings() {
           </div>
         </div>`;
 
+    // 详情首卡：从探索模式点击进入时高亮展示
+    const detailHTML = detailVoicing
+      ? `<div class="picker-detail-block">
+          <div class="picker-detail-banner">
+            <div class="picker-detail-banner-text">
+              <span class="picker-detail-tag">探索模式推荐</span>
+              <span class="picker-detail-meta">已选 ${detailVoicing.pickedSet.length} 音 · 您点选的下述指法，与您已选音对应位置一致。</span>
+            </div>
+            <button type="button" class="picker-back-btn" id="pickerBackBtn">← 返回探索模式</button>
+          </div>
+          <figure class="voicing-card detail-card">
+            <span class="voicing-tag detail-card-tag">从探索模式跳入</span>
+            <div class="chord-diagram detail-diagram">${buildVoicingSVG(detailVoicing.voicing, type, tuning, { highlightSet: detailPickMap })}</div>
+            <figcaption class="voicing-meta">${voicingMeta(detailVoicing.voicing, tuning)}</figcaption>
+          </figure>
+        </div>`
+      : "";
+
     elements.voicingArea.innerHTML =
+      detailHTML +
       sectionHTML("MUST KNOW 必学", groups.must, "must") +
       sectionHTML("OPEN CHORDS 开放和弦", groups.open, "open") +
       sectionHTML("MOVEABLE 可移位", groups.moveable, "moveable");
+
+    // 绑定返回按钮（重新渲染后元素是新节点，需重新绑定）
+    const backBtn = document.getElementById("pickerBackBtn");
+    if (backBtn) backBtn.addEventListener("click", returnToExplorer);
 
     elements.voicingHint.classList.add("visible");
     elements.voicingHintText.textContent = `${total} 个指法`;
@@ -670,6 +787,10 @@ function renderVoicings() {
     elements.fretboardArea.hidden = false;
     const legend = document.querySelector(".legend");
     if (legend) legend.hidden = true;
+    // 清空详情首卡，避免从详情视图返回后节点残留
+    if (elements.voicingArea.querySelector(".picker-detail-block")) {
+      elements.voicingArea.querySelectorAll(".picker-detail-block").forEach((n) => n.remove());
+    }
 
     const tuning = TUNINGS[state.tuningId];
     const pickedPcs = [...pickedNotes].sort((a, b) => a - b);
@@ -681,7 +802,7 @@ function renderVoicings() {
     const matchCards = matches.length === 0
       ? `<div class="theory-desc picker-empty">点击下方指板选音，将自动列出包含这些音的所有和弦（含转位）。</div>`
       : matches.map((m) => {
-          const v = pickMatchingVoicing(m.root, m.typeId, pickedNotes, tuning);
+          const v = pickMatchingVoicing(m.root, m.typeId, pickedNotes, tuning, pickedPositions);
           if (!v) return "";
           const bass = voicingBassPc(v, tuning);
           const bassName = bass !== null && bass !== m.root ? "/" + noteName(bass, state.accidental) : "";
@@ -691,11 +812,18 @@ function renderVoicings() {
             degree: m.type.labels[idx] || String(iv),
           }));
           return `
-            <figure class="voicing-card picker-card">
+            <figure class="voicing-card picker-card picker-jump-card"
+                    data-chord-jump="1"
+                    data-root="${m.root}"
+                    data-type-id="${m.typeId}"
+                    role="button"
+                    tabindex="0"
+                    aria-label="查看 ${symbol} 和弦详情">
               <span class="chord-card-symbol">${symbol}</span>
               <div class="chord-diagram">${buildVoicingSVG(v, m.type, tuning)}</div>
               <div class="chord-card-notes">${noteLabels.map((n) => `<span class="chip tone-chip chord-note-chip"><span class="chord-note-name">${n.name}</span><sub class="chord-note-deg">${n.degree}</sub></span>`).join("")}</div>
               <figcaption class="voicing-meta">${voicingMeta(v, tuning)}</figcaption>
+              <span class="picker-jump-hint" aria-hidden="true">查看详情 →</span>
             </figure>`;
         }).join("");
 
@@ -759,16 +887,17 @@ function voicingMeta(v, tuning) {
 }
 
 /* ---------------- 探索模式：匹配和弦（含转位） ---------------- */
-// 给定 voicing 与调弦，计算最低音（midi 最小）的 pitch class（bass）
+// 给定 voicing 与调弦，返回「最低发声音弦」的 pitch class（bass）
+// 注意：tuning.pitches 是 pitch class（0–11），不能简单比较 +f 当作 MIDI 比较，
+// 否则 mod12 会丢掉八度信息、误把高把位低音当作根音。
+// 正确语义：si 越小（越靠近 6 弦）= 物理音越低；取最小 si 的非闷弦作为低音。
 function voicingBassPc(v, tuning) {
-  let bestSi = -1, bestMidi = Infinity;
   for (let si = 0; si < v.frets.length; si += 1) {
     const f = v.frets[si];
     if (f < 0) continue;
-    const midi = tuning.pitches[si] + f;
-    if (midi < bestMidi) { bestMidi = midi; bestSi = si; }
+    return mod12(tuning.pitches[si] + f);
   }
-  return bestSi < 0 ? null : mod12(tuning.pitches[bestSi] + v.frets[bestSi]);
+  return null;
 }
 
 // 枚举所有 type × root(root ∈ pickedSet) 且和弦包含用户所有已选音（可含额外音）的匹配
@@ -790,19 +919,54 @@ function findMatchingChords(pickedSet) {
   return matches;
 }
 
-// 取匹配 (root, typeId) 的最佳 voicing：root position 优先（无斜杠标签）；
-// 无 rootPos 时用 pickedSet 中非根低音的转位（显示 "符号/低音"）；最后 fallback
-function pickMatchingVoicing(root, typeId, pickedSet, tuning) {
+// 取匹配 (root, typeId) 的最佳 voicing：优先与用户已选位置重合（详情页直观高亮）→
+// root position 优先 → pickedSet 中非根低音的转位 → fallback
+function pickMatchingVoicing(root, typeId, pickedSet, tuning, pickedPositions = []) {
   const groups = extendedVoicings(typeId, root, tuning.pitches);
   const all = [...groups.must, ...groups.open, ...groups.moveable];
   if (!all.length) return null;
-  const rootPos = all.find((v) => voicingBassPc(v, tuning) === root);
-  if (rootPos) return rootPos;
+
+  // 命中数：voicing 的 (si, fret) 与用户已选位置重合的数量
+  const pickSet = new Set(pickedPositions.map((p) => `${p.si}:${p.fret}`));
+  function scoreVoicing(v) {
+    let n = 0;
+    for (let si = 0; si < v.frets.length; si += 1) {
+      const f = v.frets[si];
+      if (f >= 0 && pickSet.has(`${si}:${f}`)) n += 1;
+    }
+    return n;
+  }
+  // 1) 同等根音位置中，找命中已选最多的（直观映射）
+  const rootPosList = all.filter((v) => voicingBassPc(v, tuning) === root);
+  if (rootPosList.length) {
+    let best = rootPosList[0], bestScore = scoreVoicing(best);
+    for (const v of rootPosList) {
+      const s = scoreVoicing(v);
+      if (s > bestScore) { bestScore = s; best = v; }
+    }
+    if (bestScore > 0) return best; // 至少要命中一处，否则继续
+    return best;
+  }
+  // 2) 用 pickedSet 中非根低音的转位
   const transposed = all.filter((v) => {
     const b = voicingBassPc(v, tuning);
     return b !== null && pickedSet.has(b);
   });
-  return transposed[0] || all[0];
+  if (transposed.length) {
+    let best = transposed[0], bestScore = scoreVoicing(best);
+    for (const v of transposed) {
+      const s = scoreVoicing(v);
+      if (s > bestScore) { bestScore = s; best = v; }
+    }
+    return best;
+  }
+  // 3) fallback：取命中数最多的
+  let best = all[0], bestScore = scoreVoicing(best);
+  for (const v of all) {
+    const s = scoreVoicing(v);
+    if (s > bestScore) { bestScore = s; best = v; }
+  }
+  return best;
 }
 
 // 切换（添加/移除）指板上的一个选音；同步 pickedNotes
@@ -855,6 +1019,9 @@ elements.rootButtons.addEventListener("click", (e) => {
   const btn = e.target.closest(".root-btn");
   if (!btn) return;
   state.root = Number(btn.dataset.root);
+  // 切换根音视为变更查询，详情页高亮的「匹配位置」失效，清掉
+  detailVoicing = null;
+  detailPickMap = null;
   renderAll();
 });
 
@@ -862,11 +1029,15 @@ elements.typeGroups.addEventListener("click", (e) => {
   const btn = e.target.closest(".type-btn");
   if (!btn) return;
   state.typeId = btn.dataset.type;
+  detailVoicing = null;
+  detailPickMap = null;
   renderAll();
 });
 
 elements.tuningSelect.addEventListener("change", () => {
   state.tuningId = elements.tuningSelect.value;
+  detailVoicing = null;
+  detailPickMap = null;
   renderAll();
 });
 
@@ -888,6 +1059,9 @@ elements.viewSwitch.addEventListener("click", (e) => {
   const btn = e.target.closest("button[data-view]");
   if (!btn) return;
   state.view = btn.dataset.view;
+  // 手动切视图意味着放弃当前详情快照，避免脏标记泄露到后续状态
+  detailVoicing = null;
+  detailPickMap = null;
   renderAll();
 });
 
@@ -911,6 +1085,38 @@ function updateFretboardLabelMode(mode) {
 
   saveState();
 }
+
+// 探索模式「匹配和弦卡片」点击 → 跳转详情视图（事件委托）
+elements.fretboardArea.addEventListener("click", (e) => {
+  const card = e.target.closest(".picker-jump-card[data-chord-jump]");
+  if (!card) return;
+  // 阻止冒泡到 strip 处理器（虽然 strip 只识别 .fb-string-strip）
+  e.stopPropagation();
+  const root = Number(card.dataset.root);
+  const typeId = card.dataset.typeId;
+  if (!Number.isFinite(root) || !CHORD_TYPE_MAP[typeId]) return;
+  const tuning = TUNINGS[state.tuningId];
+  const v = pickMatchingVoicing(root, typeId, pickedNotes, tuning, pickedPositions);
+  if (!v) {
+    // 兜底：极端情况无 voicing 时只切状态不进入高亮详情
+    state.root = root;
+    state.typeId = typeId;
+    state.view = "voicing";
+    renderAll();
+    return;
+  }
+  enterChordDetail({ root, typeId, type: CHORD_TYPE_MAP[typeId] }, v);
+});
+
+// 键盘可达性：picker-card 支持 Enter/Space 触发
+elements.fretboardArea.addEventListener("keydown", (e) => {
+  const card = e.target.closest && e.target.closest(".picker-jump-card[data-chord-jump]");
+  if (!card) return;
+  if (e.key === "Enter" || e.key === " ") {
+    e.preventDefault();
+    card.click();
+  }
+});
 
 // 指板标记切换（级数 / 音名）—— 事件委托
 elements.fretboardArea.addEventListener("click", (e) => {

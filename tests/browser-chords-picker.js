@@ -61,9 +61,8 @@ async function waitFor(expr, timeout = 8000) {
 
 // 在指板上点击 (si, fret)：构造 MouseEvent 并设 offsetX 以便 fretFromX 算出正确 fret
 async function clickFret(si, fret) {
-  // chord-app fretFromX 公式: round((x - leftPad - colW/2)/colW)+start = fret
-  // → x = leftPad + fret*colW + colW/2 = 34 + fret*44 + 22
-  const offsetX = 34 + fret * 44 + 22;
+  // 当前左内边距=40，0 品在 x<40 区域，其余按 (fret-1)*44 + 22 + 40 居中
+  const offsetX = fret === 0 ? 20 : 40 + (fret - 1) * 44 + 22;
   // strip y: pad.t=28, row=order.indexOf(si). 弦名/行从 si=5 在最上 si=0 在最下？order=[5,4,3,2,1,0], row 0=si5 (高音E 1弦)? 等等 chord-app 的 buildFullFretboardSVG order=[5,4,3,2,1,0]，"6弦在上"。所以 row 0=si=5? 那 row 对应 si=5(1弦)? 不对。
   // 实际 chord-app.js line 451 `order = [5, 4, 3, 2, 1, 0]; // 6弦在上`. 但 si=5 是 E4 (1弦)。注释错了。实际 SVG 里 row 0 = 列表第一个 = si=5 = 1弦。
   // 不重要，我们只要触发 picker，不依赖行号；strip 本身带 data-si。
