@@ -39,6 +39,11 @@ function loadState() {
 
 const state = loadState();
 
+// 探索模式（fretboard 视图）状态：用户点击指板选音，匹配包含这些音的所有和弦
+// 不持久化（session-only），避免下次加载残留。
+let pickedNotes = new Set();          // pitch class 集合（0-11）
+let pickedPositions = [];              // {si, fret, pc}
+
 /* ---------------- 音频：Karplus-Strong 合成引擎 ---------------- */
 const TUNING_BASE_MIDI = {
   standard: [40, 45, 50, 55, 59, 64], // 6弦..1弦 (EADGBE)
@@ -416,6 +421,7 @@ function buildFullFretboardSVG(type, tuning, opts = {}) {
   const end = opts.end ?? 24;
   const leftPad = opts.leftPad ?? 34;
   const showNames = opts.showNames ?? true;
+  const pickerMode = !!opts.pickedPositions; // 探索模式：用户点击选音，不画和弦位置
   const pad = { t: 28, r: end === 24 ? 16 : 0, b: 18, l: leftPad };
   const colW = 44;          // 放大：原 34
   const rowH = 38;          // 放大：原 30
@@ -425,11 +431,14 @@ function buildFullFretboardSVG(type, tuning, opts = {}) {
 
   // 弦序：标准吉他谱图示，6弦（低音 E）在上、1弦（高音 e）在下
   const order = [5, 4, 3, 2, 1, 0];
-  const positions = fretboardPositions(state.root, type, tuning.pitches, { frets: end })
-    .filter((p) => p.fret >= start && p.fret <= end);
+  // 探索模式：用用户已选位置；推荐指法模式：用和弦位置
+  const positions = pickerMode
+    ? (opts.pickedPositions || []).map((p) => ({ si: p.si, fret: p.fret, isRoot: !!p.isRoot, pickedPc: p.pc }))
+    : fretboardPositions(state.root, type, tuning.pitches, { frets: end })
+        .filter((p) => p.fret >= start && p.fret <= end);
 
   const parts = [];
-  parts.push(`<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" role="img" aria-label="全指板和弦音位置（${start}–${end} 品）" class="full-fretboard">`);
+  parts.push(`<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" role="img" aria-label="${pickerMode ? '全指板选音（点击切换）' : `全指板和弦音位置（${start}–${end} 品）`}" class="full-fretboard${pickerMode ? ' picker-fretboard' : ''}">`);
 
   // 品位数字（上弦枕 0 品不标）
   for (let f = start; f <= end; f += 1) {
@@ -471,26 +480,36 @@ function buildFullFretboardSVG(type, tuning, opts = {}) {
     parts.push(`<circle cx="${x}" cy="${pad.t + 4.5 * rowH}" r="6" fill="rgba(120,120,140,0.35)"/>`);
   });
 
-  // 和弦音位置 + 标记文字（级数 / 音名）
+  // 和弦音位置（推荐指法模式）或 用户点击位置（探索模式）
   positions.forEach((p) => {
     const x = leftPad + (p.fret - start) * colW + colW / 2;
     const row = order.indexOf(p.si);
     const y = pad.t + row * rowH + rowH / 2;
-    const fill = p.isRoot ? DIAGRAM_COLORS.root : DIAGRAM_COLORS.tone;
+    const pc = mod12(tuning.pitches[p.si] + p.fret);
+    const fill = pickerMode ? DIAGRAM_COLORS.root : (p.isRoot ? DIAGRAM_COLORS.root : DIAGRAM_COLORS.tone);
     parts.push(
-      `<circle cx="${x}" cy="${y}" r="${p.isRoot ? 13 : 10}" fill="${fill}" stroke="rgba(255,255,255,0.9)" stroke-width="2"/>`
+      `<circle cx="${x}" cy="${y}" r="${pickerMode ? 11 : (p.isRoot ? 13 : 10)}" fill="${fill}" stroke="rgba(255,255,255,0.9)" stroke-width="2" data-pc="${pc}" data-si="${p.si}" data-fret="${p.fret}"/>`
     );
 
-    const degLabel = degreeLabelForPosition(type, tuning, p);
-    const noteLabel = noteName(mod12(tuning.pitches[p.si] + p.fret), state.accidental);
-    const activeLabel = state.fbLabelMode === "note" ? noteLabel : degLabel;
-    if (activeLabel) {
-      const cls = p.isRoot ? "diagram-root" : "diagram-fb-label";
-      parts.push(`<text class="${cls}" x="${x}" y="${y + 1}" text-anchor="middle" dominant-baseline="central" data-fb-deg="${degLabel}" data-fb-note="${noteLabel}">${activeLabel}</text>`);
+    if (pickerMode) {
+      // 探索模式：圆心标音名（用户已选音）
+      const noteLabel = noteName(pc, state.accidental);
+      parts.push(
+        `<text class="diagram-root" x="${x}" y="${y + 1}" text-anchor="middle" dominant-baseline="central">${noteLabel}</text>`
+      );
+    } else {
+      const degLabel = degreeLabelForPosition(type, tuning, p);
+      const noteLabel = noteName(mod12(tuning.pitches[p.si] + p.fret), state.accidental);
+      const activeLabel = state.fbLabelMode === "note" ? noteLabel : degLabel;
+      if (activeLabel) {
+        const cls = p.isRoot ? "diagram-root" : "diagram-fb-label";
+        parts.push(`<text class="${cls}" x="${x}" y="${y + 1}" text-anchor="middle" dominant-baseline="central" data-fb-deg="${degLabel}" data-fb-note="${noteLabel}">${activeLabel}</text>`);
+      }
     }
   });
 
   // 透明点击条：覆盖每根弦的完整横向区域，点击后按 x 坐标计算品位并播放音高
+  // 探索模式下 click 切换 pickedPositions；推荐指法模式下仅发声
   order.forEach((si, row) => {
     const y = pad.t + row * rowH;
     parts.push(`<rect class="fb-string-strip" x="0" y="${y}" width="${w}" height="${rowH}" fill="transparent" data-si="${si}" data-start="${start}" data-end="${end}" data-left-pad="${leftPad}" data-col-w="${colW}" data-row-h="${rowH}" data-pad-t="${pad.t}" aria-label="弦 ${6 - si} 点击区"/>`);
@@ -521,6 +540,20 @@ function chip(className, text) {
 }
 
 function renderHero() {
+  if (state.view === "fretboard") {
+    elements.chordSymbol.textContent = "探索模式";
+    elements.chordCn.textContent = "选音识别";
+    const pickedPcs = [...pickedNotes].sort((a, b) => a - b);
+    elements.toneChips.innerHTML = pickedPcs.length
+      ? pickedPcs.map((s) => `<span class="chip tone-chip">${noteName(s, state.accidental)}</span>`).join("")
+      : "";
+    elements.intervalChips.innerHTML = "";
+    elements.theoryDesc.textContent = "点击下方指板任意位置可加/取消选音。已选音将自动匹配包含它们的所有和弦（含转位）。";
+    elements.chordNameCard.classList.remove("pop");
+    void elements.chordNameCard.offsetWidth;
+    elements.chordNameCard.classList.add("pop");
+    return;
+  }
   const type = currentType();
   const symbol = chordSymbol(state.root, type, state.accidental);
   const semis = chordSemitones(state.root, type);
@@ -601,33 +634,63 @@ function renderVoicings() {
     elements.diagramHint.innerHTML =
       `<span class="hint-line"></span> 弦序：${orderString(tuning)} · 数字为品位；切换调音 / 左右手，会同步刷新指法与全指板。`;
   } else {
+    // 探索模式：指板清空 + 用户点击选音 → 上方显示组成音与匹配和弦（含转位）
     elements.voicingArea.hidden = true;
     elements.fretboardArea.hidden = false;
     const legend = document.querySelector(".legend");
     if (legend) legend.hidden = true;
 
-    const degreeActive = state.fbLabelMode === "degree" ? "active" : "";
-    const noteActive = state.fbLabelMode === "note" ? "active" : "";
-    const degreePressed = state.fbLabelMode === "degree" ? "true" : "false";
-    const notePressed = state.fbLabelMode === "note" ? "true" : "false";
+    const tuning = TUNINGS[state.tuningId];
+    const pickedPcs = [...pickedNotes].sort((a, b) => a - b);
+    const noteChips = pickedPcs.length
+      ? pickedPcs.map((pc) => `<span class="chip tone-chip">${noteName(pc, state.accidental)}</span>`).join("")
+      : "";
+
+    const matches = findMatchingChords(pickedNotes);
+    const matchCards = matches.length === 0
+      ? `<div class="theory-desc picker-empty">点击下方指板选音，将自动列出包含这些音的所有和弦（含转位）。</div>`
+      : matches.map((m) => {
+          const v = pickMatchingVoicing(m.root, m.typeId, pickedNotes, tuning);
+          if (!v) return "";
+          const bass = voicingBassPc(v, tuning);
+          const bassName = bass !== null && bass !== m.root ? "/" + noteName(bass, state.accidental) : "";
+          const symbol = chordSymbol(m.root, m.type, state.accidental) + bassName;
+          const noteLabels = m.type.intervals.map((iv, idx) => ({
+            name: noteName(mod12(m.root + iv), state.accidental),
+            degree: m.type.labels[idx] || String(iv),
+          }));
+          return `
+            <figure class="voicing-card picker-card">
+              <span class="chord-card-symbol">${symbol}</span>
+              <div class="chord-diagram">${buildVoicingSVG(v, m.type, tuning)}</div>
+              <div class="chord-card-notes">${noteLabels.map((n) => `<span class="chip tone-chip chord-note-chip"><span class="chord-note-name">${n.name}</span><sub class="chord-note-deg">${n.degree}</sub></span>`).join("")}</div>
+              <figcaption class="voicing-meta">${voicingMeta(v, tuning)}</figcaption>
+            </figure>`;
+        }).join("");
 
     elements.fretboardArea.innerHTML = `
+      <div class="picker-summary">
+        <div class="picker-summary-row">
+          <span class="picker-summary-label">已选组成音</span>
+          <div class="tone-chips picker-tone-chips" aria-label="已选组成音">${noteChips || '<span class="picker-empty-text">未选</span>'}</div>
+          <button type="button" class="picker-clear-btn" id="pickerClearBtn" ${pickedPcs.length === 0 ? "disabled" : ""}>清空</button>
+        </div>
+        <p class="picker-hint">点击下方指板任意位置可加/取消选音，再次点击同一位置取消。</p>
+      </div>
       <div class="fretboard-scroll" id="fretboardScroll">
-        <div class="fretboard-part" id="fretboardPartLow">${buildFullFretboardSVG(type, tuning, { start: 0, end: 12, leftPad: 34, showNames: true })}</div>
+        <div class="fretboard-part" id="fretboardPartLow">${buildFullFretboardSVG(type, tuning, { start: 0, end: 12, leftPad: 34, showNames: true, pickedPositions })}</div>
         <div class="fretboard-more" id="fretboardMore">
           <span class="fretboard-more-arrow">向右滑动 →</span>
           <span class="fretboard-more-text">加载 13–24 品</span>
         </div>
       </div>
-      <div class="fretboard-label-switch">
-        <span class="fretboard-label-title">指板标记</span>
-        <div class="segmented" id="fbLabelSwitch">
-          <button type="button" data-fb-label="degree" class="${degreeActive}" aria-pressed="${degreePressed}">级数</button>
-          <button type="button" data-fb-label="note" class="${noteActive}" aria-pressed="${notePressed}">音名</button>
-        </div>
+      <div class="picker-matches">
+        <h3 class="picker-matches-title">匹配和弦 <span class="picker-matches-count">${matches.length}</span></h3>
+        <div class="voicing-grid picker-grid">${matchCards}</div>
       </div>`;
 
-    // 默认仅展示 0–12 品；右滑到尽头时动态加载 13–24 品
+    document.getElementById("pickerClearBtn").addEventListener("click", clearPicked);
+
     const scroll = document.getElementById("fretboardScroll");
     const lowPart = document.getElementById("fretboardPartLow");
     if (scroll && lowPart) {
@@ -638,16 +701,31 @@ function renderVoicings() {
         const max = scroll.scrollWidth - scroll.clientWidth;
         if (max > 0 && scroll.scrollLeft >= max - 60) {
           highLoaded = true;
-          loadHighFretboard(type, tuning);
+          loadHighFretboardPicker();
         }
       });
     }
 
     elements.voicingHint.classList.add("visible");
-    elements.voicingHintText.textContent = "0–12 品（右滑加载 13–24）";
+    elements.voicingHintText.textContent = `已选 ${pickedPcs.length} 音 · 匹配 ${matches.length} 个和弦`;
     elements.diagramHint.innerHTML =
-      `<span class="hint-line"></span> 深蓝为根音，桃色为和弦构成音；点击指板任意品格即可听到对应音高。`;
+      `<span class="hint-line"></span> 探索模式：点击指板切换选音；匹配和弦含转位（低音标在 <code>/X</code> 后，组成音后为音级）。`;
   }
+}
+
+/* picker 版高把位动态加载 */
+function loadHighFretboardPicker() {
+  const scroll = document.getElementById("fretboardScroll");
+  if (!scroll || document.getElementById("fretboardPartHigh")) return;
+  const tuning = TUNINGS[state.tuningId];
+  const part = document.createElement("div");
+  part.className = "fretboard-part";
+  part.id = "fretboardPartHigh";
+  part.innerHTML = buildFullFretboardSVG(currentType(), tuning, { start: 13, end: 24, leftPad: 0, showNames: false, pickedPositions });
+  const more = document.getElementById("fretboardMore");
+  scroll.insertBefore(part, more || null);
+  if (more) more.remove();
+  scroll.style.maxWidth = "none";
 }
 
 function orderString(tuning) {
@@ -664,6 +742,74 @@ function voicingMeta(v, tuning) {
   const played = v.frets.filter((f) => f >= 0).length;
   const open = v.frets.filter((f) => f === 0).length;
   return `根音 ${stringName}弦${rootFretTxt}${open ? ` · ${open} 空弦` : ""}`;
+}
+
+/* ---------------- 探索模式：匹配和弦（含转位） ---------------- */
+// 给定 voicing 与调弦，计算最低音（midi 最小）的 pitch class（bass）
+function voicingBassPc(v, tuning) {
+  let bestSi = -1, bestMidi = Infinity;
+  for (let si = 0; si < v.frets.length; si += 1) {
+    const f = v.frets[si];
+    if (f < 0) continue;
+    const midi = tuning.pitches[si] + f;
+    if (midi < bestMidi) { bestMidi = midi; bestSi = si; }
+  }
+  return bestSi < 0 ? null : mod12(tuning.pitches[bestSi] + v.frets[bestSi]);
+}
+
+// 枚举所有 type × root(root ∈ pickedSet) 且和弦包含用户所有已选音（可含额外音）的匹配
+function findMatchingChords(pickedSet) {
+  const matches = [];
+  if (pickedSet.size === 0) return matches;
+  for (const type of CHORD_TYPES) {
+    const ivals = type.intervals.map((i) => mod12(i)); // 相对根音的音程
+    for (const root of pickedSet) {
+      const chordSet = ivals.map((iv) => mod12(root + iv));
+      // 和弦必须包含用户所有已选音（可含额外音）
+      if (![...pickedSet].every((s) => chordSet.includes(s))) continue;
+      const extra = chordSet.filter((s) => !pickedSet.has(s)); // 多余音
+      matches.push({ root, typeId: type.id, type, semis: chordSet, extraCount: extra.length });
+    }
+  }
+  // 排序：多余音最少（与用户选音最贴合）→ 同多余数时 3 音先于 4 音 → 按 type.id
+  matches.sort((a, b) => a.extraCount - b.extraCount || a.type.intervals.length - b.type.intervals.length || a.typeId.localeCompare(b.typeId));
+  return matches;
+}
+
+// 取匹配 (root, typeId) 的最佳 voicing：root position 优先（无斜杠标签）；
+// 无 rootPos 时用 pickedSet 中非根低音的转位（显示 "符号/低音"）；最后 fallback
+function pickMatchingVoicing(root, typeId, pickedSet, tuning) {
+  const groups = extendedVoicings(typeId, root, tuning.pitches);
+  const all = [...groups.must, ...groups.open, ...groups.moveable];
+  if (!all.length) return null;
+  const rootPos = all.find((v) => voicingBassPc(v, tuning) === root);
+  if (rootPos) return rootPos;
+  const transposed = all.filter((v) => {
+    const b = voicingBassPc(v, tuning);
+    return b !== null && pickedSet.has(b);
+  });
+  return transposed[0] || all[0];
+}
+
+// 切换（添加/移除）指板上的一个选音；同步 pickedNotes
+function togglePickedPosition(si, fret) {
+  const tuning = TUNINGS[state.tuningId];
+  const pc = mod12(tuning.pitches[si] + fret);
+  const idx = pickedPositions.findIndex((p) => p.si === si && p.fret === fret);
+  if (idx >= 0) {
+    pickedPositions.splice(idx, 1);
+    if (!pickedPositions.some((p) => p.pc === pc)) pickedNotes.delete(pc);
+  } else {
+    pickedPositions.push({ si, fret, pc });
+    pickedNotes.add(pc);
+  }
+  renderVoicings();
+}
+
+function clearPicked() {
+  pickedNotes.clear();
+  pickedPositions = [];
+  renderVoicings();
 }
 
 function renderSettings() {
@@ -751,7 +897,7 @@ elements.fretboardArea.addEventListener("click", (e) => {
   updateFretboardLabelMode(btn.dataset.fbLabel);
 });
 
-// 指板点击发声——事件委托，兼容动态加载的高把位 SVG
+// 指板点击发声 / 选音切换——事件委托，兼容动态加载的高把位 SVG
 elements.fretboardArea.addEventListener("click", (e) => {
   const strip = e.target.closest(".fb-string-strip");
   if (!strip) return;
@@ -767,6 +913,13 @@ elements.fretboardArea.addEventListener("click", (e) => {
   const padT = Number(strip.dataset.padT);
 
   const fret = fretFromX(e.offsetX, start, leftPad, colW, end);
+  // 探索模式（picker）：点击切换已选音并发声
+  if (svg.classList.contains("picker-fretboard")) {
+    togglePickedPosition(si, fret);
+    audioEngine.play(si, fret, 1);
+    showFretHit(svg, si, fret, start, leftPad, colW, rowH, padT);
+    return;
+  }
   audioEngine.play(si, fret, 1);
   showFretHit(svg, si, fret, start, leftPad, colW, rowH, padT);
 });
