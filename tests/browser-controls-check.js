@@ -169,10 +169,11 @@ async function main() {
   await new Promise((r) => setTimeout(r, 200));
   results.push(`和弦高亮：进入高亮=${hiActive}（提示：${hint}）；指板点击发声无报错`);
 
-  // 8. 品位坐标：品位数字 1 与品位 1 的音都落在弦枕右侧第一格中心（x=78）
+  // 8. 品位坐标：单行 HTML 品位数字 1 的中心与品位 1 的音都落在弦枕右侧第一格中心（x=78）
   const fretnum1x = await evalJs(`(() => {
-    const t = [...document.querySelectorAll('#scaleFretboard .diagram-fretnum')].find(t => t.textContent === '1');
-    return t ? Number(t.getAttribute('x')) : -1;
+    const span = document.querySelector('#fretNumbers span');
+    if (!span || span.textContent !== '1') return -1;
+    return Math.round(span.offsetLeft + span.offsetWidth / 2);
   })()`);
   const openCircleX = await evalJs(`(() => {
     const c = document.querySelector('#scaleFretboard circle[cx]');
@@ -180,7 +181,7 @@ async function main() {
     const all = [...document.querySelectorAll('#scaleFretboard circle[cx]')].map(c => Number(c.getAttribute('cx'))).sort((a,b)=>a-b);
     return all[0];
   })()`);
-  results.push(`品位坐标：品位1数字 x=${fretnum1x}（期望 78），最左空弦音 x=${openCircleX}（期望 40，即 0 品在弦枕左侧）`);
+  results.push(`品位坐标：品位1数字中心 x=${fretnum1x}（期望 78），最左空弦音 x=${openCircleX}（期望 40，即 0 品在弦枕左侧）`);
 
   // 9. 空弦音级数随音阶变化：degree 模式读空弦音标注
   await evalJs(`document.querySelector('#labelSwitch button[data-label="degree"]').click()`);

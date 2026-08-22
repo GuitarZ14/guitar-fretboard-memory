@@ -234,10 +234,7 @@ function buildScaleFretboardSVG(root, scaleType, tuning, opts = {}) {
     `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" role="img" aria-label="${scaleType.cn} 指板位置（0–${frets} 品）" class="full-fretboard scale-fretboard">`
   );
 
-  for (let f = 1; f <= frets; f += 1) {
-    const x = scaleFretX(L, f);
-    parts.push(`<text class="diagram-fretnum" x="${x}" y="${pad.t - 9}" text-anchor="middle">${f}</text>`);
-  }
+  // 品位数字已由 .fret-numbers（HTML）单行渲染，SVG 内不再重复绘制
 
   for (let f = 0; f <= frets; f += 1) {
     const x = leftPad + (f - 0) * colW;
@@ -585,6 +582,55 @@ if (typeof document !== "undefined") {
   let playTimers = [];
   let playingPc = null; // 播放中当前音的 pitch class（用于高亮指板上所有同音名位置）
 
+  // C 大调顺阶和弦用户指定按法（截图来源）。
+  // 仅对 C 大调生效，其他调保持原 extendedVoicings 选择逻辑。
+  const C_MAJOR_DIATONIC_VOICINGS = {
+    triads: [
+      { frets: [-1, 3, 2, 0, 1, 0], typeId: "major", rootStrings: [1, 4] },      // I   C
+      { frets: [-1, 5, 7, 7, 6, 5], typeId: "minor", rootStrings: [1, 3] },      // ii  Dm
+      { frets: [0, 2, 2, 0, 0, 0], typeId: "minor", rootStrings: [0, 2, 5] },    // iii Em
+      { frets: [8, 10, 10, 9, 8, 8], typeId: "major", rootStrings: [0, 2, 5] },  // IV  F
+      { frets: [-1, 10, 9, 7, 8, 7], typeId: "major", rootStrings: [1, 4] },     // V   G
+      { frets: [-1, 0, 2, 2, 1, 0], typeId: "minor", rootStrings: [1, 3] },      // vi  Am
+      { frets: [-1, 2, 3, 4, 3, 1], typeId: "dim", rootStrings: [1, 3] },        // vii° Bdim
+    ],
+    sevenths: [
+      { frets: [-1, 3, 2, 0, 0, 0], typeId: "maj7", rootStrings: [1] },          // Imaj7   Cmaj7
+      { frets: [-1, 5, 7, 5, 6, 5], typeId: "m7", rootStrings: [1] },            // ii7     Dm7
+      { frets: [0, 2, 0, 0, 0, 0], typeId: "m7", rootStrings: [0, 5] },          // iii7    Em7
+      { frets: [8, 10, 9, 9, 8, 8], typeId: "maj7", rootStrings: [0, 2, 5] },    // IVmaj7  Fmaj7
+      { frets: [-1, 10, 9, 7, 6, 7], typeId: "7", rootStrings: [1] },            // V7      G7
+      { frets: [-1, 0, 2, 0, 1, 3], typeId: "m7", rootStrings: [1, 3] },         // vi7     Am7
+      { frets: [-1, 2, 3, 2, 3, 1], typeId: "m7b5", rootStrings: [1] },          // vii7b5  Bm7b5
+    ],
+  };
+
+  // 根据硬编码 frets 构造 voicing 对象（复用引擎的指法/分组函数）
+  function makeVoicingFromFrets(template, rootSemi, tuningPitches) {
+    const frets = template.frets;
+    const pressed = frets.filter((f) => f > 0);
+    const baseFret = pressed.length ? Math.min(...pressed) : 0;
+    const span = pressed.length ? Math.max(...pressed) - baseFret : 0;
+    const rootStrings = [];
+    for (let si = 0; si < 6; si += 1) {
+      const f = frets[si];
+      if (f >= 0 && mod12(tuningPitches[si] + f) === rootSemi) {
+        rootStrings.push(si);
+      }
+    }
+    if (rootStrings.length === 0) return null;
+    return {
+      frets,
+      baseFret,
+      span,
+      rootStrings,
+      fingers: assignFingers(frets),
+      group: classifyVoicing({ frets, baseFret }, true),
+      label: "顺阶常用",
+      source: "diatonic-template",
+    };
+  }
+
   const els = {
     tuningSelect: document.querySelector("#tuningSelect"),
     tuningDesc: document.querySelector("#tuningDesc"),
@@ -732,7 +778,16 @@ if (typeof document !== "undefined") {
     renderChordGrid(els.seventhGrid, currentDiatonic.sevenths, true);
   }
 
-  function pickVoicing(rootSemi, typeId) {
+  function pickVoicing(rootSemi, typeId, degree, isSeventh) {
+    // C 大调使用用户指定的顺阶和弦按法
+    if (state.root === 0 && currentScale().id === "major" && degree >= 0 && degree <= 6) {
+      const list = isSeventh ? C_MAJOR_DIATONIC_VOICINGS.sevenths : C_MAJOR_DIATONIC_VOICINGS.triads;
+      const template = list[degree];
+      if (template && template.typeId === typeId) {
+        const v = makeVoicingFromFrets(template, rootSemi, currentTuning().pitches);
+        if (v) return v;
+      }
+    }
     const res = extendedVoicings(typeId, rootSemi, currentTuning().pitches, {});
     const list = res.open.length ? res.open : res.must;
     return list.length ? list[0] : null;
@@ -742,7 +797,7 @@ if (typeof document !== "undefined") {
     container.textContent = "";
     chords.forEach((c) => {
       const type = CHORD_TYPE_MAP[c.typeId];
-      const v = pickVoicing(c.rootSemi, c.typeId);
+      const v = pickVoicing(c.rootSemi, c.typeId, c.degree, isSeventh);
       const cell = document.createElement("div");
       cell.className = "chord-cell";
       cell.dataset.semis = c.semis.join(",");
