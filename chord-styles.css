@@ -1094,3 +1094,125 @@ footer > span { margin-right: 2px; }
   .chord-name-card:hover,
   .voicing-card:hover { transform: none !important; translate: none !important; }
 }
+
+/* ===================== 探索模式（全指板选音） ===================== */
+.picker-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px 14px 14px;
+  background: var(--surface);
+  border: var(--clay-border-sm);
+  border-radius: 12px;
+  box-shadow: var(--shadow-clay-sm);
+  margin-bottom: 14px;
+}
+.picker-summary-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.picker-summary-label {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  color: var(--text-2);
+  text-transform: uppercase;
+}
+.picker-tone-chips {
+  flex: 1;
+  min-height: 28px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.picker-empty-text {
+  font-size: 11px;
+  color: var(--text-3);
+  font-weight: 600;
+}
+.picker-clear-btn {
+  padding: 6px 14px;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  color: var(--text-2);
+  background: var(--surface);
+  border: var(--clay-border-sm);
+  border-radius: var(--radius-pill);
+  cursor: pointer;
+  transition: transform .15s ease, color .15s ease;
+}
+.picker-clear-btn:hover:not(:disabled) { transform: translateY(-1px); color: var(--green); }
+.picker-clear-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+.picker-hint { margin: 0; font-size: 11px; color: var(--text-3); }
+
+.picker-fretboard { cursor: crosshair; }
+
+.picker-matches {
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px dashed rgba(120, 120, 140, 0.18);
+}
+.picker-matches-title {
+  margin: 0 0 10px;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  color: var(--text-2);
+  text-transform: uppercase;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.picker-matches-title::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: rgba(120, 120, 140, 0.18);
+}
+.picker-matches-count {
+  background: var(--surface-pink);
+  color: #7a4a44;
+  padding: 2px 10px;
+  border-radius: var(--radius-pill);
+  font-size: 11px;
+  font-weight: 800;
+}
+.picker-grid { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); }
+
+.picker-card { padding: 8px 8px 10px; align-items: center; }
+.chord-card-symbol {
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--text);
+  line-height: 1;
+  margin-bottom: 4px;
+}
+.chord-card-notes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  justify-content: center;
+  margin-top: 4px;
+}
+.chord-note-chip {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 2px;
+  padding: 2px 7px;
+  font-size: 10px;
+  font-weight: 800;
+}
+.chord-note-name { line-height: 1; }
+.chord-note-deg {
+  font-size: 8px;
+  font-weight: 800;
+  color: var(--green);
+  position: relative;
+  top: -3px;
+  margin-left: 1px;
+}
+.picker-empty { width: 100%; margin: 0 !important; }
