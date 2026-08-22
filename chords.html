@@ -10,6 +10,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="chord-styles.css?v=12" />
+    <link rel="stylesheet" href="fretboard-fullscreen.css?v=1" />
   </head>
   <body>
     <main class="app-shell">
@@ -120,6 +121,7 @@
                 <span aria-hidden="true">●</span>
                 <span id="voicingHintText">自动生成</span>
               </div>
+              <button class="fb-fullscreen-btn" id="fbFullscreenBtn" type="button" aria-label="指板全屏放大与标注">⤢ 全屏标注</button>
             </div>
 
             <div id="voicingArea"></div>
@@ -166,6 +168,29 @@
 
     <script src="chord-engine.js?v=4"></script>
     <script src="chord-app.js?v=22"></script>
+    <script src="fretboard-annotate.js?v=1"></script>
+    <script>
+      // 指板全屏放大 + 自由标注
+      (function () {
+        var btn = document.getElementById('fbFullscreenBtn');
+        if (!btn) return;
+        btn.addEventListener('click', function () {
+          // 若当前处于「推荐指法」视图，先切到「全指板」视图，等渲染后再全屏
+          var fb = document.getElementById('fretboardArea');
+          function openFs() {
+            var svg = fb && fb.querySelector('svg');
+            if (window.FretboardAnnotate) window.FretboardAnnotate.open(svg, '和弦全指板');
+          }
+          if (fb && fb.hidden) {
+            var tab = document.querySelector('#viewSwitch button[data-view="fretboard"]');
+            if (tab) tab.click();
+            setTimeout(openFs, 120);
+          } else {
+            openFs();
+          }
+        });
+      })();
+    </script>
     <script>
       // 滚动触发入场动画：进入视口时添加 .in-view（播放一次）
       (function () {
