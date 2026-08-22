@@ -183,6 +183,7 @@ const SCALE_DIAGRAM_COLORS = {
   root: "#4f8fb0",
   tone: "#f5a69c",
   highlight: "#2fa45a",
+  playing: "#e8a13c", // 播放时高亮当前音级（所有同音名位置）
 };
 
 function scaleStringWidth(si, thin, thick) {
@@ -191,15 +192,21 @@ function scaleStringWidth(si, thin, thick) {
 
 // 与 buildFullFretboardSVG 一致的布局参数
 function scaleFbLayout(frets) {
-  const leftPad = 34;
+  const leftPad = 56; // 弦枕 x 位置；左侧留给空弦音（0 品）与弦名
   const colW = 44;
   const rowH = 38;
+  const openX = leftPad - 16; // 空弦音（0 品）圆点中心
   const pad = { t: 28, r: frets >= 22 ? 16 : 0, b: 18, l: leftPad };
   const rightEdge = leftPad + (frets - 0) * colW;
   const w = rightEdge + pad.r;
   const h = pad.t + 6 * rowH + pad.b;
   const order = [5, 4, 3, 2, 1, 0]; // 6 弦在上
-  return { leftPad, colW, rowH, pad, rightEdge, w, h, order };
+  return { leftPad, colW, rowH, pad, rightEdge, w, h, order, openX };
+}
+
+// 品位 f 的中心 x：f=0（空弦/0 品）画在弦枕左侧，f≥1 落在对应品格格子中心
+function scaleFretX(L, fret) {
+  return fret <= 0 ? L.openX : L.leftPad + (fret - 1) * L.colW + L.colW / 2;
 }
 
 /* ===================== 指板 SVG（音阶） ===================== */
@@ -208,6 +215,7 @@ function buildScaleFretboardSVG(root, scaleType, tuning, opts = {}) {
   const labelMode = opts.labelMode ?? "note"; // note | degree
   const accidental = opts.accidental ?? "sharp";
   const highlight = opts.highlight || null; // Set<number> 或数组（pitch class）
+  const playingPc = opts.playingPc ?? null; // 播放时高亮的 pitch class（所有同音名位置）
   const L = scaleFbLayout(frets);
   const { leftPad, colW, rowH, pad, rightEdge, w, h, order } = L;
 
@@ -227,7 +235,7 @@ function buildScaleFretboardSVG(root, scaleType, tuning, opts = {}) {
   );
 
   for (let f = 1; f <= frets; f += 1) {
-    const x = leftPad + (f - 0) * colW + colW / 2;
+    const x = scaleFretX(L, f);
     parts.push(`<text class="diagram-fretnum" x="${x}" y="${pad.t - 9}" text-anchor="middle">${f}</text>`);
   }
 
@@ -243,36 +251,40 @@ function buildScaleFretboardSVG(root, scaleType, tuning, opts = {}) {
     const y = pad.t + row * rowH + rowH / 2;
     const sw = scaleStringWidth(si, 2, 6);
     parts.push(`<line x1="${leftPad}" y1="${y}" x2="${rightEdge}" y2="${y}" stroke="${SCALE_DIAGRAM_COLORS.line}" stroke-width="${sw}"/>`);
-    parts.push(`<text class="diagram-stringname" x="${leftPad - 9}" y="${y + 3}" text-anchor="end">${noteName(tuning.pitches[si], accidental)}</text>`);
+    parts.push(`<text class="diagram-stringname" x="${leftPad - 34}" y="${y + 3}" text-anchor="end">${noteName(tuning.pitches[si], accidental)}</text>`);
   });
 
   // 品记
   [3, 5, 7, 9, 15, 17, 19, 21].forEach((f) => {
     if (f > frets) return;
-    const x = leftPad + f * colW + colW / 2;
+    const x = scaleFretX(L, f);
     parts.push(`<circle cx="${x}" cy="${pad.t + 3 * rowH}" r="6" fill="rgba(120,120,140,0.35)"/>`);
   });
   [12, 24].forEach((f) => {
     if (f > frets) return;
-    const x = leftPad + f * colW + colW / 2;
+    const x = scaleFretX(L, f);
     parts.push(`<circle cx="${x}" cy="${pad.t + 2.5 * rowH}" r="6" fill="rgba(120,120,140,0.35)"/>`);
     parts.push(`<circle cx="${x}" cy="${pad.t + 4.5 * rowH}" r="6" fill="rgba(120,120,140,0.35)"/>`);
   });
 
   positions.forEach((p) => {
-    const x = leftPad + p.fret * colW + colW / 2;
+    const x = scaleFretX(L, p.fret);
     const row = order.indexOf(p.si);
     const y = pad.t + row * rowH + rowH / 2;
     const semi = scaleMod12(tuning.pitches[p.si] + p.fret);
     const note = noteName(semi, accidental);
     const degree = semiToDegree[semi] ?? "";
     const isHi = highlight && (Array.isArray(highlight) ? highlight.includes(semi) : highlight.has(semi));
+    const isPlaying = playingPc !== null && playingPc !== undefined && semi === playingPc;
     const r = p.isRoot ? 13 : 10;
     const fill = p.isRoot ? SCALE_DIAGRAM_COLORS.root : SCALE_DIAGRAM_COLORS.tone;
 
-    // 高亮环（组成音）
+    // 高亮环（组成音/当前播放音级）
     if (isHi) {
       parts.push(`<circle cx="${x}" cy="${y}" r="${r + 6}" fill="none" stroke="${SCALE_DIAGRAM_COLORS.highlight}" stroke-width="3.5"/>`);
+    }
+    if (isPlaying) {
+      parts.push(`<circle cx="${x}" cy="${y}" r="${r + 6}" fill="none" stroke="${SCALE_DIAGRAM_COLORS.playing}" stroke-width="3.5"/>`);
     }
 
     parts.push(
@@ -523,6 +535,8 @@ if (typeof module !== "undefined" && module.exports) {
     buildScaleRun,
     scaleMod12,
     stringMidi,
+    scaleFbLayout,
+    scaleFretX,
     intervalKey,
     TRIAD_MAP,
     SEVENTH_MAP,
@@ -569,6 +583,7 @@ if (typeof document !== "undefined") {
   let highlightSet = null; // 当前高亮的和弦 pitch class 数组
   let isPlaying = false;
   let playTimers = [];
+  let playingPc = null; // 播放中当前音的 pitch class（用于高亮指板上所有同音名位置）
 
   const els = {
     tuningSelect: document.querySelector("#tuningSelect"),
@@ -693,13 +708,14 @@ if (typeof document !== "undefined") {
       labelMode: state.labelMode,
       accidental: state.accidental,
       highlight: highlightSet,
+      playingPc,
     });
     els.fretboard.innerHTML = svg;
 
-    // 品位数字条：与 SVG 品位列对齐（起始 = leftPad+colW，每格 colW）
+    // 品位数字条：span f 中心 = paddingLeft + (f-1)*colW + colW/2，与 SVG 品位 f 中心对齐
     const L = scaleFbLayout(frets);
     els.fretNumbers.textContent = "";
-    els.fretNumbers.style.paddingLeft = `${L.leftPad + L.colW}px`;
+    els.fretNumbers.style.paddingLeft = `${L.leftPad}px`;
     for (let f = 1; f <= frets; f += 1) {
       const span = document.createElement("span");
       span.textContent = String(f);
@@ -806,8 +822,9 @@ if (typeof document !== "undefined") {
   }
 
   /* ---------- 指板点击发声 ---------- */
+  // 点击坐标 x → 品位：品位 f 中心 = leftPad + (f-1)*colW + colW/2，f=0 为弦枕左侧空弦区
   function fretFromX(x, start, leftPad, colW, end) {
-    const f = Math.round((x - leftPad - colW / 2) / colW) + start;
+    const f = Math.round((x - leftPad + colW / 2) / colW) + start;
     return Math.max(start, Math.min(end, f));
   }
 
@@ -818,7 +835,7 @@ if (typeof document !== "undefined") {
     const order = L.order;
     const row = order.indexOf(si);
     if (row < 0) return;
-    const x = L.leftPad + fret * L.colW + L.colW / 2;
+    const x = scaleFretX(L, fret);
     const y = L.pad.t + row * L.rowH + L.rowH / 2;
     const circle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
     circle.setAttribute("cx", x);
@@ -854,12 +871,16 @@ if (typeof document !== "undefined") {
     playTimers.forEach((id) => clearTimeout(id));
     playTimers = [];
     isPlaying = false;
+    playingPc = null;
     updatePlayButton();
+    renderFretboard(); // 清除播放中的全局高亮
   }
 
   function finishScale() {
     isPlaying = false;
+    playingPc = null;
     updatePlayButton();
+    renderFretboard();
   }
 
   function updatePlayButton() {
@@ -885,6 +906,8 @@ if (typeof document !== "undefined") {
     updatePlayButton();
     run.forEach((p, idx) => {
       const id = setTimeout(() => {
+        playingPc = p.semi; // 高亮指板上所有同音名位置
+        renderFretboard();
         scaleAudioEngine.play(currentTuning(), p.si, p.fret);
         flashNote(p.si, p.fret);
         if (idx === run.length - 1) finishScale();

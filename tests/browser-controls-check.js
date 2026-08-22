@@ -104,6 +104,25 @@ async function main() {
   if (!(await waitFor(`document.querySelector('#scaleFretboard') && document.querySelector('#scaleFretboard').innerHTML.includes('<svg')`))) {
     throw new Error("页面未加载指板");
   }
+  // 注入空弦音级数读取函数
+  await evalJs(`(() => {
+    window.readOpenDegrees = function () {
+      const svg = document.querySelector('#scaleFretboard svg');
+      // 只取实心圆点（排除 fill=none 的高亮环/播放环）
+      const circles = [...svg.querySelectorAll('circle[cx="40"]')].filter(c => c.getAttribute('fill') !== 'none');
+      const items = circles.map(c => {
+        const cy = Number(c.getAttribute('cy'));
+        const texts = [...svg.querySelectorAll('text')].filter(t => {
+          const ty = Number(t.getAttribute('y'));
+          const tx = Number(t.getAttribute('x'));
+          return Math.abs(ty - cy) < 3 && tx === 40;
+        });
+        const center = texts.find(t => !t.classList.contains('diagram-degree'));
+        return { cy, label: center ? center.textContent.trim() : '?' };
+      }).sort((a, b) => a.cy - b.cy);
+      return items.map(i => i.label).join(' ');
+    };
+  })()`);
 
   const results = [];
 
@@ -150,8 +169,44 @@ async function main() {
   await new Promise((r) => setTimeout(r, 200));
   results.push(`和弦高亮：进入高亮=${hiActive}（提示：${hint}）；指板点击发声无报错`);
 
+  // 8. 品位坐标：品位数字 1 与品位 1 的音都落在弦枕右侧第一格中心（x=78）
+  const fretnum1x = await evalJs(`(() => {
+    const t = [...document.querySelectorAll('#scaleFretboard .diagram-fretnum')].find(t => t.textContent === '1');
+    return t ? Number(t.getAttribute('x')) : -1;
+  })()`);
+  const openCircleX = await evalJs(`(() => {
+    const c = document.querySelector('#scaleFretboard circle[cx]');
+    // 空弦音是最左的圆点（cx 最小）
+    const all = [...document.querySelectorAll('#scaleFretboard circle[cx]')].map(c => Number(c.getAttribute('cx'))).sort((a,b)=>a-b);
+    return all[0];
+  })()`);
+  results.push(`品位坐标：品位1数字 x=${fretnum1x}（期望 78），最左空弦音 x=${openCircleX}（期望 40，即 0 品在弦枕左侧）`);
+
+  // 9. 空弦音级数随音阶变化：degree 模式读空弦音标注
+  await evalJs(`document.querySelector('#labelSwitch button[data-label="degree"]').click()`);
+  const openDegC = await evalJs(`readOpenDegrees()`);
+  await evalJs(`document.querySelector('#rootButtons .root-btn[data-root="7"]').click()`);
+  const openDegG = await evalJs(`readOpenDegrees()`);
+  await evalJs(`document.querySelector('#rootButtons .root-btn[data-root="0"]').click()`);
+  await evalJs(`document.querySelector('#labelSwitch button[data-label="note"]').click()`);
+  const degCOk = openDegC === "3 6 2 5 7 3" || openDegC === "3 7 5 2 6 3";
+  const degGOk = openDegG === "6 2 5 1 3 6" || openDegG === "6 3 1 5 2 6";
+  results.push(`空弦级数：C 调 [${openDegC}]（期望 3 6 2 5 7 3）、G 调 [${openDegG}]（期望 6 2 5 1 3 6）→ C:${degCOk} G:${degGOk}`);
+
+  // 10. 播放时指板中所有该音高亮：先切回 12 品，播放 C 大调第 1 个音（C），
+  //     12 品内共有 6 个 C（每根弦各 1 个），应出现 6 个播放色环
+  await evalJs(`document.querySelector('#rangeSwitch button[data-range="12"]').click()`);
+  await evalJs(`document.querySelector('#playButton').click()`);
+  await waitFor(`document.querySelectorAll('#scaleFretboard circle[stroke="#e8a13c"]').length > 0`, 2000);
+  const playingRings = await evalJs(`document.querySelectorAll('#scaleFretboard circle[stroke="#e8a13c"]').length`);
+  await evalJs(`document.querySelector('#playButton').click()`); // 停止
+  const ringsAfter = await evalJs(`document.querySelectorAll('#scaleFretboard circle[stroke="#e8a13c"]').length`);
+  const ringsOk = playingRings === 6 && ringsAfter === 0;
+  results.push(`播放高亮：C 大调播放 C 音时高亮环 ${playingRings} 个（12 品内 6 个 C 位置，期望 6），停止后 ${ringsAfter} 个`);
+
   // 汇总
-  const allOk = triOk && sevOk && w1 > w0 && r22Active && num1 === 22 && saved.octaves === 2 && saved.tempo === 620 && playing && hiActive;
+  const allOk = triOk && sevOk && w1 > w0 && r22Active && num1 === 22 && saved.octaves === 2 && saved.tempo === 620 && playing && hiActive
+    && fretnum1x === 78 && openCircleX === 40 && degCOk && degGOk && ringsOk;
   console.log("=== 真实浏览器验证 ===");
   results.forEach((r) => console.log("  " + r));
   if (pageErrors.length) {
