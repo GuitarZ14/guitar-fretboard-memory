@@ -147,15 +147,33 @@ const audioEngine = {
   },
 };
 
-function fretFromX(x, start, leftPad, colW, end) {
-  const f = Math.round((x - leftPad - colW / 2) / colW) + start;
-  return Math.max(start, Math.min(end, f));
+/* 全指板横向图布局：0 品空弦音画在弦枕左侧专用位置，不占品位格子 */
+function chordFbLayout(start, end, leftPad, colW) {
+  const openPad = 40; // 弦枕 x 位置，左侧留给空弦音与弦名
+  const actualLeftPad = start === 0 ? (leftPad ?? openPad) : (leftPad ?? 0);
+  const openX = actualLeftPad - 16; // 空弦音（0 品）圆点中心
+  return { start, end, leftPad: actualLeftPad, colW, openX };
+}
+
+function chordFretX(L, fret) {
+  if (fret <= 0) return L.openX;
+  return L.leftPad + (fret - L.start - 1) * L.colW + L.colW / 2;
+}
+
+// 点击 x 坐标 → 品位：空弦区（弦枕左侧）返回 0，其余按所在品格格子计算
+function chordFretFromX(x, start, leftPad, colW, end) {
+  if (start === 0 && x < leftPad) return 0;
+  const base = start === 0 ? 1 : start + 1;
+  const minFret = start === 0 ? 0 : start + 1;
+  const f = base + Math.floor((x - leftPad) / colW);
+  return Math.max(minFret, Math.min(end, f));
 }
 
 function showFretHit(svg, si, fret, start, leftPad, colW, rowH, padT) {
   const order = [5, 4, 3, 2, 1, 0];
   const row = order.indexOf(si);
-  const x = leftPad + (fret - start) * colW + colW / 2;
+  const L = chordFbLayout(start, 24, leftPad, colW);
+  const x = chordFretX(L, fret);
   const y = padT + row * rowH + rowH / 2;
   const circle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
   circle.setAttribute("cx", x);
@@ -190,6 +208,7 @@ const elements = {
   accidentalSwitch: document.querySelector("#accidentalSwitch"),
   viewSwitch: document.querySelector("#viewSwitch"),
   chordNameCard: document.querySelector(".chord-name-card"),
+  heroCard: document.querySelector(".hero-card"),
 };
 
 /* ---------------- 工具 ---------------- */
@@ -412,20 +431,22 @@ function buildVoicingSVG(v, type, tuning) {
 }
 
 /* ---------------- 全指板横向图 SVG（可分段渲染） ----------------
-   opts: { start=0, end=24, leftPad=34, showNames=true }
+   opts: { start=0, end=24, leftPad=40, showNames=true, minFret }
    - 仅渲染 [start, end] 品，便于「首屏 0–12、右滑动态加载 13–24」
+   - 高把位段可传 start=12、minFret=13、leftPad=0，使 12 品丝与低把位段对齐
    - 各段共用同一 colW/rowH，拼接处无间隙
 */
 function buildFullFretboardSVG(type, tuning, opts = {}) {
   const start = opts.start ?? 0;
   const end = opts.end ?? 24;
-  const leftPad = opts.leftPad ?? 34;
+  const minFret = opts.minFret ?? start;
+  const colW = 44;          // 放大：原 34
+  const L = chordFbLayout(start, end, opts.leftPad, colW);
   const showNames = opts.showNames ?? true;
   const pickerMode = !!opts.pickedPositions; // 探索模式：用户点击选音，不画和弦位置
-  const pad = { t: 28, r: end === 24 ? 16 : 0, b: 18, l: leftPad };
-  const colW = 44;          // 放大：原 34
+  const pad = { t: 28, r: end === 24 ? 16 : 0, b: 18, l: L.leftPad };
   const rowH = 38;          // 放大：原 30
-  const rightEdge = leftPad + (end - start) * colW; // 最后一品品丝 x（琴弦止于此处）
+  const rightEdge = L.leftPad + (end - start) * colW; // 最后一品品丝 x（琴弦止于此处）
   const w = rightEdge + pad.r;
   const h = pad.t + 6 * rowH + pad.b;
 
@@ -433,9 +454,9 @@ function buildFullFretboardSVG(type, tuning, opts = {}) {
   const order = [5, 4, 3, 2, 1, 0];
   // 探索模式：用用户已选位置；推荐指法模式：用和弦位置
   const positions = pickerMode
-    ? (opts.pickedPositions || []).map((p) => ({ si: p.si, fret: p.fret, isRoot: !!p.isRoot, pickedPc: p.pc }))
+    ? (opts.pickedPositions || []).filter((p) => p.fret >= minFret && p.fret <= end).map((p) => ({ si: p.si, fret: p.fret, isRoot: !!p.isRoot, pickedPc: p.pc }))
     : fretboardPositions(state.root, type, tuning.pitches, { frets: end })
-        .filter((p) => p.fret >= start && p.fret <= end);
+        .filter((p) => p.fret >= minFret && p.fret <= end);
 
   const parts = [];
   parts.push(`<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" role="img" aria-label="${pickerMode ? '全指板选音（点击切换）' : `全指板和弦音位置（${start}–${end} 品）`}" class="full-fretboard${pickerMode ? ' picker-fretboard' : ''}">`);
@@ -443,13 +464,13 @@ function buildFullFretboardSVG(type, tuning, opts = {}) {
   // 品位数字（上弦枕 0 品不标）
   for (let f = start; f <= end; f += 1) {
     if (f === 0) continue;
-    const x = leftPad + (f - start) * colW + colW / 2;
+    const x = chordFretX(L, f);
     parts.push(`<text class="diagram-fretnum" x="${x}" y="${pad.t - 9}" text-anchor="middle">${f}</text>`);
   }
 
   // 品丝竖线：比琴弦粗，以突出指板分隔
   for (let f = start; f <= end; f += 1) {
-    const x = leftPad + (f - start) * colW;
+    const x = L.leftPad + (f - start) * colW;
     const isNut = f === 0;
     parts.push(
       `<line x1="${x}" y1="${pad.t}" x2="${x}" y2="${pad.t + 6 * rowH}" stroke="${isNut ? DIAGRAM_COLORS.nut : DIAGRAM_COLORS.line}" stroke-width="${isNut ? 8 : 7}"/>`
@@ -460,9 +481,9 @@ function buildFullFretboardSVG(type, tuning, opts = {}) {
   order.forEach((si, row) => {
     const y = pad.t + row * rowH + rowH / 2;
     const sw = stringWidth(si, 2, 6);
-    parts.push(`<line x1="${leftPad}" y1="${y}" x2="${rightEdge}" y2="${y}" stroke="${DIAGRAM_COLORS.line}" stroke-width="${sw}"/>`);
+    parts.push(`<line x1="${L.leftPad}" y1="${y}" x2="${rightEdge}" y2="${y}" stroke="${DIAGRAM_COLORS.line}" stroke-width="${sw}"/>`);
     if (showNames) {
-      parts.push(`<text class="diagram-stringname" x="${leftPad - 9}" y="${y + 3}" text-anchor="end">${noteName(tuning.pitches[si], state.accidental)}</text>`);
+      parts.push(`<text class="diagram-stringname" x="${L.leftPad - 34}" y="${y + 3}" text-anchor="end">${noteName(tuning.pitches[si], state.accidental)}</text>`);
     }
   });
 
@@ -470,19 +491,19 @@ function buildFullFretboardSVG(type, tuning, opts = {}) {
   const singleInlays = [3, 5, 7, 9, 15, 17, 19, 21];
   singleInlays.forEach((f) => {
     if (f < start || f > end) return;
-    const x = leftPad + (f - start) * colW + colW / 2;
+    const x = chordFretX(L, f);
     parts.push(`<circle cx="${x}" cy="${pad.t + 3 * rowH}" r="6" fill="rgba(120,120,140,0.35)"/>`);
   });
   [12, 24].forEach((f) => {
     if (f < start || f > end) return;
-    const x = leftPad + (f - start) * colW + colW / 2;
+    const x = chordFretX(L, f);
     parts.push(`<circle cx="${x}" cy="${pad.t + 2.5 * rowH}" r="6" fill="rgba(120,120,140,0.35)"/>`);
     parts.push(`<circle cx="${x}" cy="${pad.t + 4.5 * rowH}" r="6" fill="rgba(120,120,140,0.35)"/>`);
   });
 
   // 和弦音位置（推荐指法模式）或 用户点击位置（探索模式）
   positions.forEach((p) => {
-    const x = leftPad + (p.fret - start) * colW + colW / 2;
+    const x = chordFretX(L, p.fret);
     const row = order.indexOf(p.si);
     const y = pad.t + row * rowH + rowH / 2;
     const pc = mod12(tuning.pitches[p.si] + p.fret);
@@ -512,7 +533,7 @@ function buildFullFretboardSVG(type, tuning, opts = {}) {
   // 探索模式下 click 切换 pickedPositions；推荐指法模式下仅发声
   order.forEach((si, row) => {
     const y = pad.t + row * rowH;
-    parts.push(`<rect class="fb-string-strip" x="0" y="${y}" width="${w}" height="${rowH}" fill="transparent" data-si="${si}" data-start="${start}" data-end="${end}" data-left-pad="${leftPad}" data-col-w="${colW}" data-row-h="${rowH}" data-pad-t="${pad.t}" aria-label="弦 ${6 - si} 点击区"/>`);
+    parts.push(`<rect class="fb-string-strip" x="0" y="${y}" width="${w}" height="${rowH}" fill="transparent" data-si="${si}" data-start="${start}" data-end="${end}" data-left-pad="${L.leftPad}" data-col-w="${colW}" data-row-h="${rowH}" data-pad-t="${pad.t}" aria-label="弦 ${6 - si} 点击区"/>`);
   });
 
   parts.push("</svg>");
@@ -527,7 +548,7 @@ function loadHighFretboard(type, tuning) {
   const part = document.createElement("div");
   part.className = "fretboard-part";
   part.id = "fretboardPartHigh";
-  part.innerHTML = buildFullFretboardSVG(type, tuning, { start: 13, end: 24, leftPad: 0, showNames: false });
+  part.innerHTML = buildFullFretboardSVG(type, tuning, { start: 12, end: 24, minFret: 13, leftPad: 0, showNames: false });
   if (more) scroll.insertBefore(part, more);
   else scroll.appendChild(part);
   if (more) more.remove();
@@ -582,8 +603,18 @@ function renderVoicings() {
   const tuning = TUNINGS[state.tuningId];
   const symbol = chordSymbol(state.root, type, state.accidental);
 
-  elements.diagramTitle.textContent = `${symbol} 的按法`;
-  elements.resultKicker.textContent = state.view === "voicing" ? "推荐指法" : "全指板";
+  // 探索模式下隐藏上方 Hero 卡片（内容与 picker-summary 重复），让指板上移
+  if (elements.heroCard) {
+    elements.heroCard.hidden = state.view === "fretboard";
+  }
+
+  if (state.view === "fretboard") {
+    elements.diagramTitle.textContent = "探索模式";
+    elements.resultKicker.textContent = "选音识别";
+  } else {
+    elements.diagramTitle.textContent = `${symbol} 的按法`;
+    elements.resultKicker.textContent = "推荐指法";
+  }
 
   if (state.view === "voicing") {
     elements.fretboardArea.hidden = true;
@@ -678,7 +709,7 @@ function renderVoicings() {
         <p class="picker-hint">点击下方指板任意位置可加/取消选音，再次点击同一位置取消。</p>
       </div>
       <div class="fretboard-scroll" id="fretboardScroll">
-        <div class="fretboard-part" id="fretboardPartLow">${buildFullFretboardSVG(type, tuning, { start: 0, end: 12, leftPad: 34, showNames: true, pickedPositions })}</div>
+        <div class="fretboard-part" id="fretboardPartLow">${buildFullFretboardSVG(type, tuning, { start: 0, end: 12, leftPad: 40, showNames: true, pickedPositions })}</div>
         <div class="fretboard-more" id="fretboardMore">
           <span class="fretboard-more-arrow">向右滑动 →</span>
           <span class="fretboard-more-text">加载 13–24 品</span>
@@ -721,7 +752,7 @@ function loadHighFretboardPicker() {
   const part = document.createElement("div");
   part.className = "fretboard-part";
   part.id = "fretboardPartHigh";
-  part.innerHTML = buildFullFretboardSVG(currentType(), tuning, { start: 13, end: 24, leftPad: 0, showNames: false, pickedPositions });
+  part.innerHTML = buildFullFretboardSVG(currentType(), tuning, { start: 12, end: 24, minFret: 13, leftPad: 0, showNames: false, pickedPositions });
   const more = document.getElementById("fretboardMore");
   scroll.insertBefore(part, more || null);
   if (more) more.remove();
@@ -920,7 +951,7 @@ elements.fretboardArea.addEventListener("click", (e) => {
   const rowH = Number(strip.dataset.rowH);
   const padT = Number(strip.dataset.padT);
 
-  const fret = fretFromX(e.offsetX, start, leftPad, colW, end);
+  const fret = chordFretFromX(e.offsetX, start, leftPad, colW, end);
   // 探索模式（picker）：点击切换已选音并发声
   if (svg.classList.contains("picker-fretboard")) {
     togglePickedPosition(si, fret);

@@ -115,9 +115,10 @@ button { color: inherit; cursor: pointer; }
 
 .app-shell {
   position: relative;
-  width: min(1180px, calc(100% - 40px));
-  margin: 24px auto 0;
-  padding-bottom: 16px;
+  width: 100%;
+  max-width: 100%;
+  margin: 0;
+  padding: 22px 32px 24px;
 }
 
 /* ===================== 顶栏 ===================== */
@@ -223,6 +224,21 @@ button { color: inherit; cursor: pointer; }
   .brand small { font-size: 10px; }
   .tool-link { padding: 9px 16px; font-size: 12px; }
   .tool-tab { padding: 9px 18px; font-size: 13px; }
+
+  /* 三栏：随屏加宽放大侧栏与间距，与指板练习页保持同一套布局逻辑 */
+  .chords-layout { grid-template-columns: minmax(260px, 300px) minmax(0, 1fr) minmax(260px, 300px); gap: 24px; }
+  .layout-left { gap: 16px; }
+  .control-card { padding: 16px 18px 14px; }
+  .control-card h2 { font-size: 15px; }
+  .section-heading h1 { font-size: 28px; }
+  .fretboard-section { padding: 20px 26px 20px; }
+}
+
+/* 超宽屏：增加外边距呼吸感，并适度放大侧栏，与指板练习页一致 */
+@media (min-width: 1600px) {
+  .app-shell { padding: 26px 48px 28px; }
+  .chords-layout { grid-template-columns: minmax(300px, 340px) minmax(0, 1fr) minmax(300px, 340px); gap: 32px; }
+  .section-heading h1 { font-size: 32px; }
 }
 
 /* ===================== 当前和弦 Hero ===================== */
@@ -990,7 +1006,7 @@ footer > span { margin-right: 2px; }
 
 /* 移动端 ≤760px：单栏，顺序 主区 → 和弦列表 → 控制 → 理论 */
 @media (max-width: 760px) {
-  .app-shell { width: min(100% - 16px, 1180px); margin-top: 14px; padding-bottom: 14px; }
+  .app-shell { width: 100%; margin-top: 14px; padding: 14px 14px 14px; }
   .topbar { min-height: 46px; padding: 6px 12px; margin-bottom: 10px; }
   .brand-mark { width: 30px; height: 30px; font-size: 16px; }
   .brand strong { font-size: 12px; }
