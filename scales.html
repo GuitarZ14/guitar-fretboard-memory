@@ -69,29 +69,29 @@
               <div class="control-icon" aria-hidden="true">⚙</div>
               <div>
                 <h2>显示选项</h2>
-                <p>指板范围与播放设置</p>
+                <p>指板范围与标注方式</p>
               </div>
             </div>
             <div class="setting-block">
               <span class="setting-label">指板范围</span>
-              <div class="segmented" id="rangeSwitch" role="group" aria-label="指板品位范围">
-                <button type="button" data-range="12" class="active" aria-pressed="true">0–12 品</button>
-                <button type="button" data-range="22" aria-pressed="false">0–22 品</button>
-              </div>
-            </div>
-            <div class="setting-block">
-              <span class="setting-label">音阶跨度</span>
-              <div class="segmented" id="octaveSwitch" role="group" aria-label="播放音阶跨度">
-                <button type="button" data-oct="1" class="active" aria-pressed="true">1 个八度</button>
-                <button type="button" data-oct="2" aria-pressed="false">2 个八度</button>
-              </div>
-            </div>
-            <div class="setting-block">
-              <span class="setting-label">播放速度</span>
-              <div class="segmented" id="tempoSwitch" role="group" aria-label="播放速度">
-                <button type="button" data-tempo="620" aria-pressed="false">慢</button>
-                <button type="button" data-tempo="380" class="active" aria-pressed="true">中</button>
-                <button type="button" data-tempo="240" aria-pressed="false">快</button>
+              <div class="fret-range-slider" role="group" aria-label="指板范围选择">
+                <div class="range-values" aria-live="polite">
+                  <span id="fretRangeMin">0</span>
+                  <span>–</span>
+                  <span id="fretRangeMax">12</span>
+                  <span>品</span>
+                </div>
+                <div class="range-track-wrap">
+                  <div class="range-track-bg"></div>
+                  <div class="range-track-fill" id="fretRangeFill"></div>
+                  <input type="range" id="fretRangeMinInput" min="0" max="24" value="0" step="1" aria-label="起始品格" />
+                  <input type="range" id="fretRangeMaxInput" min="0" max="24" value="12" step="1" aria-label="结束品格" />
+                </div>
+                <div class="range-labels">
+                  <span>0</span>
+                  <span>12</span>
+                  <span>24</span>
+                </div>
               </div>
             </div>
           </article>
@@ -208,7 +208,7 @@
     </main>
 
     <script src="chord-engine.js?v=3"></script>
-    <script src="scale-app.js?v=4"></script>
+    <script src="scale-app.js?v=5"></script>
     <script>
       // 滚动触发入场动画：进入视口时添加 .in-view（播放一次）
       (function () {
