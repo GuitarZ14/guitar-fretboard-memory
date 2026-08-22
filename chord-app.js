@@ -792,14 +792,22 @@ function pickMatchingVoicing(root, typeId, pickedSet, tuning) {
 }
 
 // 切换（添加/移除）指板上的一个选音；同步 pickedNotes
+// 同一根弦上只保留最新选择的音，避免重叠。
 function togglePickedPosition(si, fret) {
   const tuning = TUNINGS[state.tuningId];
   const pc = mod12(tuning.pitches[si] + fret);
-  const idx = pickedPositions.findIndex((p) => p.si === si && p.fret === fret);
-  if (idx >= 0) {
-    pickedPositions.splice(idx, 1);
-    if (!pickedPositions.some((p) => p.pc === pc)) pickedNotes.delete(pc);
-  } else {
+  const sameString = pickedPositions.filter((p) => p.si === si);
+  const sameFretIdx = pickedPositions.findIndex((p) => p.si === si && p.fret === fret);
+
+  // 先清除该弦上所有旧选择，并同步清理它们贡献的 pitch class
+  for (const p of sameString) {
+    const i = pickedPositions.indexOf(p);
+    if (i >= 0) pickedPositions.splice(i, 1);
+    if (!pickedPositions.some((q) => q.pc === p.pc)) pickedNotes.delete(p.pc);
+  }
+
+  // 如果点击的是当前已选中的音，则视为取消选择；否则加入最新音
+  if (sameFretIdx < 0) {
     pickedPositions.push({ si, fret, pc });
     pickedNotes.add(pc);
   }
