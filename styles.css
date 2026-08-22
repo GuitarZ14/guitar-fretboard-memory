@@ -116,9 +116,10 @@ button { color: inherit; cursor: pointer; }
 
 .app-shell {
   position: relative;
-  width: min(1240px, calc(100% - 40px));
-  margin: 24px auto 0;
-  padding-bottom: 16px;
+  width: 100%;
+  max-width: 100%;
+  margin: 0;
+  padding: 22px 32px 24px;
 }
 
 /* ===================== 桌面左右分栏布局（方案三） ===================== */
@@ -265,6 +266,43 @@ button { color: inherit; cursor: pointer; }
   .round-count strong { font-size: 32px; }
   .tool-link { padding: 9px 16px; font-size: 12px; }
   .tool-tab { padding: 9px 18px; font-size: 13px; }
+
+  /* 分栏：随屏幕加宽适当放大侧栏与间距，内容铺满 */
+  .layout-split { grid-template-columns: minmax(268px, 300px) minmax(0, 1fr); gap: 24px; }
+  .sidebar-controls { gap: 16px; }
+  .control-card { padding: 16px 18px 14px; }
+  .control-card h2 { font-size: 15px; }
+
+  /* 中央音名：更大更醒目 */
+  .note-card { width: 152px; height: 152px; }
+  .note-card span { font-size: 86px; }
+  .note-actions { gap: 14px; }
+  .side-action { width: 140px; min-height: 48px; font-size: 13px; }
+  .instruction { font-size: 13px; max-width: 300px; }
+
+  /* 指板区域：放大行高与字号，铺满宽度 */
+  .section-heading h1 { font-size: 28px; }
+  .fretboard-section { padding: 20px 26px 20px; }
+  .fretboard { grid-template-rows: repeat(6, 46px); }
+  .fret-numbers { font-size: 12px; }
+  .fretboard-hint { font-size: 11px; }
+  .answer-note { width: 30px; height: 30px; font-size: 13px; }
+  .fret-inlay { width: 14px; height: 14px; }
+  .practice-stats { padding: 12px 18px; }
+  .stat-item strong { font-size: 17px; }
+  .mode-tab { padding: 9px 20px; font-size: 12px; }
+}
+
+/* 超宽屏：增加外边距呼吸感，并适度放大侧栏与核心字号 */
+@media (min-width: 1600px) {
+  .app-shell { padding: 26px 48px 28px; }
+  .layout-split { grid-template-columns: minmax(300px, 340px) minmax(0, 1fr); gap: 32px; }
+  .sidebar-controls { gap: 18px; }
+  .note-card { width: 168px; height: 168px; }
+  .note-card span { font-size: 96px; }
+  .section-heading h1 { font-size: 32px; }
+  .fretboard { grid-template-rows: repeat(6, 52px); }
+  .answer-note { width: 34px; height: 34px; font-size: 14px; }
 }
 
 /* ===================== Hero ===================== */
@@ -1025,7 +1063,7 @@ kbd { padding: 3px 6px; color: var(--text-2); background: var(--surface); border
 
 /* ===================== 响应式 ===================== */
 @media (max-width: 760px) {
-  .app-shell { width: min(100% - 16px, 1240px); margin-top: 14px; padding-bottom: 14px; }
+  .app-shell { width: 100%; margin-top: 14px; padding: 14px 14px 14px; }
   .topbar { min-height: 46px; padding: 6px 12px; margin-bottom: 10px; }
   .brand-mark { width: 30px; height: 30px; font-size: 16px; }
   .brand strong { font-size: 12px; }

@@ -87,14 +87,14 @@ async function box(page, sel) {
   }));
   check('无横向溢出', overflow.scrollW <= overflow.clientW + 2, `scrollW=${overflow.scrollW} clientW=${overflow.clientW}`);
 
-  // 顶栏双 Tab 切换器（指板练习 ↔ 和弦速查）
+  // 顶栏 Tab 切换器（指板练习 / 和弦速查 / 音阶练习）
   const topTabs = await page.$$eval('.tool-nav.tabs .tool-tab', (els) => els.map((e) => ({
     text: e.textContent.trim(),
     active: e.classList.contains('active'),
     href: e.getAttribute('href'),
   })));
-  check('顶栏存在「指板练习 / 和弦速查」双 Tab', topTabs.length === 2 && topTabs[0].text === '指板练习' && topTabs[1].text === '和弦速查');
-  check('当前页「指板练习」Tab 高亮', topTabs[0].active && !topTabs[1].active && topTabs[0].href === 'index.html' && topTabs[1].href === 'chords.html');
+  check('顶栏存在三个工具 Tab', topTabs.length === 3 && topTabs[0].text === '指板练习' && topTabs[1].text === '和弦速查' && topTabs[2].text === '音阶练习');
+  check('当前页「指板练习」Tab 高亮', topTabs[0].active && !topTabs[1].active && !topTabs[2].active && topTabs[0].href === 'index.html' && topTabs[1].href === 'chords.html' && topTabs[2].href === 'scales.html');
 
   // 双 Tab 在顶栏中保持居中（与和弦速查页统一）
   const topbarBox = await box(page, '.topbar');
