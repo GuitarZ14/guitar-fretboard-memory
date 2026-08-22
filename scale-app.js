@@ -212,7 +212,8 @@ function scaleFretX(L, fret) {
 /* ===================== 指板 SVG（音阶） ===================== */
 function buildScaleFretboardSVG(root, scaleType, tuning, opts = {}) {
   const frets = opts.frets ?? 12;
-  const startFret = Math.max(0, Math.min(frets, Number(opts.startFret) || 0));
+  const startFret = Number.isFinite(opts.startFret) ? Math.max(0, Math.min(frets, opts.startFret)) : 0;
+  const endFret = Number.isFinite(opts.endFret) ? Math.max(startFret, Math.min(frets, opts.endFret)) : frets;
   const labelMode = opts.labelMode ?? "note"; // note | degree
   const accidental = opts.accidental ?? "sharp";
   const highlight = opts.highlight || null; // Set<number> 或数组（pitch class）
@@ -265,10 +266,10 @@ function buildScaleFretboardSVG(root, scaleType, tuning, opts = {}) {
     parts.push(`<circle cx="${x}" cy="${pad.t + 4.5 * rowH}" r="6" fill="rgba(120,120,140,0.35)"/>`);
   });
 
-  // 选中品位区间高亮带（起始品 > 0 时绘制，覆盖 startFret..endFret）
-  if (startFret > 0) {
+  // 选中品位区间高亮带：覆盖 [startFret, endFret]，其余区域保持普通
+  if (startFret < endFret) {
     const bx0 = leftPad + startFret * colW;
-    const bx1 = leftPad + frets * colW;
+    const bx1 = leftPad + endFret * colW;
     parts.push(
       `<rect class="fb-range-band" x="${bx0}" y="${pad.t}" width="${bx1 - bx0}" height="${6 * rowH}" rx="10" fill="rgba(155,197,217,0.18)" stroke="rgba(155,197,217,0.55)" stroke-width="2"/>`
     );
@@ -770,10 +771,12 @@ if (typeof document !== "undefined") {
   /* ---------- 渲染指板 ---------- */
   function renderFretboard() {
     const sc = currentScale();
-    const frets = state.endFret;
+    // 指板始终完整显示 0–24 品；滑块仅控制高亮区间 [startFret, endFret]
+    const boardFrets = SCALE_MAX_FRET;
     const svg = buildScaleFretboardSVG(state.root, sc, currentTuning(), {
-      frets,
+      frets: boardFrets,
       startFret: state.startFret,
+      endFret: state.endFret,
       labelMode: state.labelMode,
       accidental: state.accidental,
       highlight: highlightSet,
@@ -781,11 +784,11 @@ if (typeof document !== "undefined") {
     });
     els.fretboard.innerHTML = svg;
 
-    // 品位数字条：span f 中心 = paddingLeft + (f-1)*colW + colW/2，与 SVG 品位 f 中心对齐
-    const L = scaleFbLayout(frets);
+    // 品位数字条：完整显示 1..24 品
+    const L = scaleFbLayout(boardFrets);
     els.fretNumbers.textContent = "";
     els.fretNumbers.style.paddingLeft = `${L.leftPad}px`;
-    for (let f = 1; f <= frets; f += 1) {
+    for (let f = 1; f <= boardFrets; f += 1) {
       const span = document.createElement("span");
       span.textContent = String(f);
       span.style.width = `${L.colW}px`;
@@ -909,7 +912,7 @@ if (typeof document !== "undefined") {
   function flashNote(si, fret) {
     const svg = els.fretboard.querySelector("svg");
     if (!svg) return;
-    const L = scaleFbLayout(state.endFret);
+    const L = scaleFbLayout(SCALE_MAX_FRET);
     const order = L.order;
     const row = order.indexOf(si);
     if (row < 0) return;

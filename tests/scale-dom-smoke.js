@@ -229,10 +229,12 @@ try {
   fireEvent(bySel["#playButton"], "click"); // 立即停止（清空定时器）
   console.log("✓ 播放/停止：无异常，定时器已清理");
 
-  /* ---- 交互 5：拖动“结束品”滑块 12→22 品 ---- */
+  /* ---- 交互 5：拖动“结束品”滑块 12→22 品，高亮带右移但指板保持完整 0–24 品 ---- */
   const maxInput = bySel["#fretRangeMaxInput"];
   const minInput = bySel["#fretRangeMinInput"];
   const fbBefore = bySel["#scaleFretboard"].innerHTML;
+  const boardWidthBefore = Number(/width="(\d+)"/.exec(fbBefore)[1]);
+  const bandWidthBefore = Number(/class="fb-range-band"[^>]*\swidth="(\d+)"/.exec(fbBefore)?.[1]);
   maxInput.value = "22";
   fireEvent(maxInput, "input", maxInput);
   const fbAfter = bySel["#scaleFretboard"].innerHTML;
@@ -240,12 +242,13 @@ try {
   const saved5 = JSON.parse(localStorageStub._d["guitar-scale-practice-settings"]);
   assert.strictEqual(saved5.endFret, 22, "endFret 应持久化为 22");
   assert.strictEqual(saved5.startFret, 0, "startFret 应保持为 0");
-  const w22 = Number(/width="(\d+)"/.exec(fbAfter)[1]);
-  const w12 = Number(/width="(\d+)"/.exec(fbBefore)[1]);
-  assert.ok(w22 > w12, `22 品指板宽度应更大（${w12} → ${w22}）`);
-  console.log(`✓ 指板范围滑块：结束品 12→22 生效，SVG 宽度 ${w12}→${w22}`);
+  const boardWidthAfter = Number(/width="(\d+)"/.exec(fbAfter)[1]);
+  const bandWidthAfter = Number(/class="fb-range-band"[^>]*\swidth="(\d+)"/.exec(fbAfter)?.[1]);
+  assert.strictEqual(boardWidthAfter, boardWidthBefore, "指板应始终完整显示 0–24 品，宽度不随 endFret 改变");
+  assert.ok(bandWidthAfter > bandWidthBefore, `高亮带应随结束品右扩（${bandWidthBefore} → ${bandWidthAfter}）`);
+  console.log(`✓ 指板范围滑块：结束品 12→22 生效；指板宽度保持 ${boardWidthAfter}，高亮带 ${bandWidthBefore}→${bandWidthAfter}`);
 
-  /* ---- 交互 6：拖动“起始品”滑块 0→5 品，并验证高亮带 ---- */
+  /* ---- 交互 6：拖动“起始品”滑块 0→5 品，并验证高亮带左移 ---- */
   minInput.value = "5";
   fireEvent(minInput, "input", minInput);
   const saved6 = JSON.parse(localStorageStub._d["guitar-scale-practice-settings"]);
@@ -253,8 +256,9 @@ try {
   assert.strictEqual(saved6.endFret, 22, "endFret 应保持为 22");
   const fbBand = bySel["#scaleFretboard"].innerHTML;
   assert.ok(fbBand.includes("fb-range-band"), "起始品>0 时指板应绘制选中区间高亮带");
+  const bandX6 = Number(/class="fb-range-band"[^>]*\sx="(\d+(?:\.\d+)?)"/.exec(fbBand)?.[1]);
+  assert.ok(bandX6 > 0, `高亮带左端应随起始品右移（x=${bandX6}）`);
   // 两端交叉防护：min 拖到超过 max 时应对齐到 max
-  const savedBand = saved6;
   minInput.value = "99";
   fireEvent(minInput, "input", minInput);
   const savedCross = JSON.parse(localStorageStub._d["guitar-scale-practice-settings"]);
