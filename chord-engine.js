@@ -78,6 +78,12 @@ const CHORD_TYPES = [
     aliases: ["sus4"],
     desc: "用纯四度音替换三度音，产生悬而未决的张力，常解决到大三和弦，是摇滚与流行中的高频音色。",
   },
+  {
+    id: "sus4#5", group: "triad", suffix: "sus4#5", cn: "挂四升五和弦",
+    intervals: [0, 5, 8], labels: ["1", "4", "#5"],
+    aliases: ["sus4sharp5"],
+    desc: "挂四和弦同时升高五度，形成 4 度与 #5 度并存的增四度张力，听感神秘，常出现在爵士与前卫摇滚中。",
+  },
 
   /* === Four tone（四音和弦）=== */
   {
