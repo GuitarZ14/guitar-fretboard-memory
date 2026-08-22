@@ -171,6 +171,35 @@
   margin: 0 auto;
 }
 
+/* 顺阶和弦卡片「查看详情」按钮：与 chord 速查页跳转入口对齐 */
+.chord-cell-detail-btn {
+  margin-top: 4px;
+  padding: 4px 8px;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  color: #7a4a44;
+  background: #fde6e1;
+  border: 1px solid rgba(245, 166, 156, 0.7);
+  border-radius: 999px;
+  cursor: pointer;
+  transition: translate .15s ease, box-shadow .15s ease, background .15s ease;
+  white-space: nowrap;
+}
+.chord-cell-detail-btn:hover,
+.chord-cell-detail-btn:focus-visible {
+  translate: 0 -2px;
+  background: #fff5f1;
+  box-shadow: var(--shadow-clay-sm, 0 2px 0 #d2d6e0);
+  outline: none;
+}
+.chord-cell-detail-btn:active { translate: 0 0; }
+.chord-cell.active .chord-cell-detail-btn {
+  background: #fff;
+  border-color: rgba(47, 164, 90, 0.5);
+  color: var(--green);
+}
+
 /* 品格区间双滑块（指板范围） */
 .fret-range-slider { margin-top: 10px; }
 .range-values {

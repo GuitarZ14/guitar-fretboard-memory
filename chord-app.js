@@ -39,10 +39,13 @@ function loadState() {
 
 const state = loadState();
 
-// 探索模式（fretboard 视图）状态：用户点击指板选音，匹配包含这些音的所有和弦
-// 不持久化（session-only），避免下次加载残留。
-let pickedNotes = new Set();          // pitch class 集合（0-11）
-let pickedPositions = [];              // {si, fret, pc}
+/* 入口参数：从其他页面跳转进来时携带的上下文（探索模式之外、和弦速查页作为详情目的地）
+ * entrySource = null | "scale"   来源页面
+ * entryNotes = pitch class 数组  用于详情首卡高亮（chord 的组成音）
+ * 不参与 localStorage 持久化（URL 参数 / sessionStorage 决定生命周期）*/
+let entrySource = null;
+let entryNotes = [];
+let entryVoicing = null; // scales 页面传入的 voicing（可直接渲染，避免算法重选）
 
 // 探索模式 → 详情模式 过渡状态：用户点击匹配卡片时设置，渲染详情首卡。
 // detailVoicing  非空时，详情页顶部显示「探索模式推荐」按法图，并高亮用户已选位置。
@@ -50,6 +53,107 @@ let pickedPositions = [];              // {si, fret, pc}
 // 不参与持久化（session 关闭即清空）。
 let detailVoicing = null;
 let detailPickMap = null;
+
+function applyEntryParams() {
+  let params;
+  try {
+    params = new URLSearchParams(window.location.search);
+  } catch {
+    return;
+  }
+  if (!params.get("from")) return;
+  if (params.get("from") === "scale") {
+    const root = Number(params.get("root"));
+    const type = params.get("type");
+    const tuning = params.get("tuning");
+    const handed = params.get("handed");
+    const acc = params.get("acc");
+    const notes = (params.get("notes") || "")
+      .split(",")
+      .map(Number)
+      .filter((n) => Number.isFinite(n));
+    if (!Number.isFinite(root) || !CHORD_TYPE_MAP[type]) return;
+    state.root = ((root % 12) + 12) % 12;
+    state.typeId = type;
+    if (TUNINGS[tuning]) state.tuningId = tuning;
+    state.handed = handed === "left" ? "left" : "right";
+    state.accidental = acc === "flat" ? "flat" : "sharp";
+    state.view = "voicing";
+    entrySource = "scale";
+    entryNotes = notes;
+    // 还原 scales 页面传入的 voicing（与按法、品位等坐标完全一致，避免 chord-engine 重选）
+    const vfStr = params.get("vf");
+    if (vfStr) {
+      const frets = vfStr.split(",").map(Number);
+      const vb = Number(params.get("vb"));
+      if (frets.length === 6 && frets.every(Number.isFinite)) {
+        entryVoicing = {
+          frets,
+          baseFret: Number.isFinite(vb) ? vb : 0,
+          // 其它字段由 buildVoicingSVG 自身补全
+        };
+      }
+    }
+    // 清掉 URL 参数，避免污染刷新/分享
+    try {
+      history.replaceState({}, "", window.location.pathname);
+    } catch {
+      // 忽略
+    }
+  }
+}
+applyEntryParams();
+
+/* 把入口参数转成 detailVoicing + detailPickMap
+ * 优先级：用 entryVoicing（精确坐标）→ 否则在 chord-engine 推荐中按命中数选最贴合的 */
+function buildDetailFromEntry() {
+  if (!entrySource || !entryNotes.length) return;
+  const tuning = TUNINGS[state.tuningId];
+  let voicing = entryVoicing;
+  if (voicing) {
+    // 补全 rootStrings / span / fingers 等元数据
+    const fs = voicing.frets.filter((f) => f > 0);
+    const span = fs.length ? Math.max(...fs) - Math.min(...fs) : 0;
+    const pressed = voicing.frets.filter((f) => f > 0);
+    const baseFret = pressed.length ? Math.min(...pressed) : voicing.baseFret || 0;
+    voicing.baseFret = baseFret;
+    voicing.span = span;
+    // 根音弦：voicing 中发出 root pc 的弦
+    const rootStrings = [];
+    for (let si = 0; si < voicing.frets.length; si += 1) {
+      const f = voicing.frets[si];
+      if (f >= 0 && mod12(tuning.pitches[si] + f) === state.root) rootStrings.push(si);
+    }
+    voicing.rootStrings = rootStrings;
+    voicing.fingers = assignFingers(voicing.frets);
+  } else {
+    // fallback：跑一次 extendedVoicings，按 entryNotes 命中数挑最贴合的
+    voicing = pickMatchingVoicing(state.root, state.typeId, new Set(entryNotes), tuning, []);
+    if (!voicing) return;
+  }
+  // 高亮：voicing 中发出音 pc ∈ entryNotes 的全部 (si, fret)
+  const noteSet = new Set(entryNotes);
+  const pickMap = new Set();
+  for (let si = 0; si < voicing.frets.length; si += 1) {
+    const f = voicing.frets[si];
+    if (f < 0) continue;
+    const pc = mod12(tuning.pitches[si] + f);
+    if (noteSet.has(pc)) pickMap.add(`${si}:${f}`);
+  }
+  detailVoicing = {
+    root: state.root,
+    typeId: state.typeId,
+    voicing,
+    pickedSet: [...entryNotes].sort((a, b) => a - b),
+  };
+  detailPickMap = pickMap;
+}
+buildDetailFromEntry();
+
+// 探索模式（fretboard 视图）状态：用户点击指板选音，匹配包含这些音的所有和弦
+// 不持久化（session-only），避免下次加载残留。
+let pickedNotes = new Set();          // pitch class 集合（0-11）
+let pickedPositions = [];              // {si, fret, pc}
 
 const PICKER_BACKUP_KEY = "gcfm-explorer-backup";
 
@@ -118,6 +222,16 @@ function returnToExplorer() {
   state.view = "fretboard";
   clearPickedBackup();
   renderAll();
+}
+
+// 统一的返回入口：根据 entrySource 分派到不同来源页
+function returnToEntry() {
+  if (entrySource === "scale") {
+    // 跳回音阶练习页；scales.html 启动时会按 gcfm-scale-backup 恢复状态
+    window.location.href = "scales.html";
+    return;
+  }
+  returnToExplorer();
 }
 
 /* ---------------- 音频：Karplus-Strong 合成引擎 ---------------- */
@@ -749,22 +863,33 @@ function renderVoicings() {
           </div>
         </div>`;
 
-    // 详情首卡：从探索模式点击进入时高亮展示
+    // 详情首卡：根据入口来源显示不同 banner 文案/返回路径
+    // entrySource = "scale" 时按音阶练习页跳转来算；否则按探索模式点击匹配卡片来算
     const detailHTML = detailVoicing
-      ? `<div class="picker-detail-block">
+      ? (() => {
+          const isScale = entrySource === "scale";
+          const tagText = isScale ? "音阶练习页推荐" : "探索模式推荐";
+          const tagForCard = isScale ? "从音阶练习页跳入" : "从探索模式跳入";
+          const metaText = isScale
+            ? `所属音阶级数 · 已选 ${detailVoicing.pickedSet.length} 音 · 此和弦为所选音阶的顺阶和弦，按法与组成音位置已高亮。`
+            : `已选 ${detailVoicing.pickedSet.length} 音 · 您点选的下述指法，与您已选音对应位置一致。`;
+          const backText = isScale ? "← 返回音阶练习" : "← 返回探索模式";
+          return `
+        <div class="picker-detail-block">
           <div class="picker-detail-banner">
             <div class="picker-detail-banner-text">
-              <span class="picker-detail-tag">探索模式推荐</span>
-              <span class="picker-detail-meta">已选 ${detailVoicing.pickedSet.length} 音 · 您点选的下述指法，与您已选音对应位置一致。</span>
+              <span class="picker-detail-tag">${tagText}</span>
+              <span class="picker-detail-meta">${metaText}</span>
             </div>
-            <button type="button" class="picker-back-btn" id="pickerBackBtn">← 返回探索模式</button>
+            <button type="button" class="picker-back-btn" id="pickerBackBtn">${backText}</button>
           </div>
           <figure class="voicing-card detail-card">
-            <span class="voicing-tag detail-card-tag">从探索模式跳入</span>
+            <span class="voicing-tag detail-card-tag">${tagForCard}</span>
             <div class="chord-diagram detail-diagram">${buildVoicingSVG(detailVoicing.voicing, type, tuning, { highlightSet: detailPickMap })}</div>
             <figcaption class="voicing-meta">${voicingMeta(detailVoicing.voicing, tuning)}</figcaption>
           </figure>
-        </div>`
+        </div>`;
+        })()
       : "";
 
     elements.voicingArea.innerHTML =
@@ -775,7 +900,7 @@ function renderVoicings() {
 
     // 绑定返回按钮（重新渲染后元素是新节点，需重新绑定）
     const backBtn = document.getElementById("pickerBackBtn");
-    if (backBtn) backBtn.addEventListener("click", returnToExplorer);
+    if (backBtn) backBtn.addEventListener("click", returnToEntry);
 
     elements.voicingHint.classList.add("visible");
     elements.voicingHintText.textContent = `${total} 个指法`;
@@ -1022,6 +1147,9 @@ elements.rootButtons.addEventListener("click", (e) => {
   // 切换根音视为变更查询，详情页高亮的「匹配位置」失效，清掉
   detailVoicing = null;
   detailPickMap = null;
+  entrySource = null;
+  entryNotes = [];
+  entryVoicing = null;
   renderAll();
 });
 
@@ -1031,6 +1159,9 @@ elements.typeGroups.addEventListener("click", (e) => {
   state.typeId = btn.dataset.type;
   detailVoicing = null;
   detailPickMap = null;
+  entrySource = null;
+  entryNotes = [];
+  entryVoicing = null;
   renderAll();
 });
 
@@ -1038,6 +1169,9 @@ elements.tuningSelect.addEventListener("change", () => {
   state.tuningId = elements.tuningSelect.value;
   detailVoicing = null;
   detailPickMap = null;
+  entrySource = null;
+  entryNotes = [];
+  entryVoicing = null;
   renderAll();
 });
 
@@ -1062,6 +1196,9 @@ elements.viewSwitch.addEventListener("click", (e) => {
   // 手动切视图意味着放弃当前详情快照，避免脏标记泄露到后续状态
   detailVoicing = null;
   detailPickMap = null;
+  entrySource = null;
+  entryNotes = [];
+  entryVoicing = null;
   renderAll();
 });
 

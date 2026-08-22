@@ -554,6 +554,7 @@ if (typeof module !== "undefined" && module.exports) {
 /* ===================== 浏览器初始化 ===================== */
 if (typeof document !== "undefined") {
   const STORAGE_KEY = "guitar-scale-practice-settings";
+  const SCALE_BACKUP_KEY = "gcfm-scale-backup";
   const DEFAULT_STATE = {
     root: 0,
     scaleId: "major",
@@ -567,6 +568,20 @@ if (typeof document !== "undefined") {
 
   function clampFret(n) {
     return Math.max(0, Math.min(24, Math.round(n) || 0));
+  }
+
+  /* 从和弦详情页跳回时按备份恢复音阶练习页控制状态；备份仅保留一次会话生命周期 */
+  function applyScaleBackup() {
+    try {
+      const raw = sessionStorage.getItem(SCALE_BACKUP_KEY);
+      if (!raw) return null;
+      sessionStorage.removeItem(SCALE_BACKUP_KEY);
+      const b = JSON.parse(raw);
+      if (!b || typeof b !== "object") return null;
+      return b;
+    } catch {
+      return null;
+    }
   }
 
   function loadState() {
@@ -596,7 +611,21 @@ if (typeof document !== "undefined") {
     return { ...DEFAULT_STATE };
   }
 
+  /* 合并 sessionStorage 备份（来自和弦详情页的返回路径），覆盖默认控制状态 */
+  function mergeScaleBackup(s, backup) {
+    if (!backup) return;
+    if (Number.isFinite(backup.root)) s.root = backup.root % 12;
+    if (SCALE_TYPE_MAP[backup.scaleId]) s.scaleId = backup.scaleId;
+    if (TUNINGS[backup.tuningId]) s.tuningId = backup.tuningId;
+    s.accidental = backup.accidental === "flat" ? "flat" : "sharp";
+    s.handed = backup.handed === "left" ? "left" : "right";
+    s.labelMode = backup.labelMode === "degree" ? "degree" : "note";
+    if (Number.isFinite(backup.fbRangeMin)) s.startFret = clampFret(backup.fbRangeMin);
+    if (Number.isFinite(backup.fbRangeMax)) s.endFret = clampFret(backup.fbRangeMax);
+  }
+
   const state = loadState();
+  mergeScaleBackup(state, applyScaleBackup());
   let currentDiatonic = null;
   let highlightSet = null; // 当前高亮的和弦 pitch class 数组
   let isPlaying = false;
@@ -819,6 +848,41 @@ if (typeof document !== "undefined") {
     return list.length ? list[0] : null;
   }
 
+  /* 跳转至和弦速查页详情视图（与探索模式 → 详情完全一致的交互）
+   * - URL 参数携带：from=scale、root、type、tuning、handed、acc、notes（逗号分隔 pitch class）
+   * - sessionStorage 备份当前 scales.html 状态，返回时按备份恢复
+   * - 当 voicing 为空时仍可跳转（详情页会兜底渲染普通推荐指法） */
+  function jumpToChordDetail(c, voicing) {
+    try {
+      sessionStorage.setItem("gcfm-scale-backup", JSON.stringify({
+        root: state.root,
+        scaleId: state.scaleId,
+        tuningId: state.tuningId,
+        accidental: state.accidental,
+        handed: state.handed,
+        labelMode: state.labelMode,
+        fbRangeMin: state.startFret,
+        fbRangeMax: state.endFret,
+      }));
+    } catch {
+      // 隐私模式可能不可用，忽略
+    }
+    const params = new URLSearchParams({
+      from: "scale",
+      root: String(c.rootSemi),
+      type: c.typeId,
+      tuning: state.tuningId,
+      handed: state.handed,
+      acc: state.accidental,
+      notes: c.semis.join(","),
+    });
+    if (voicing) {
+      params.set("vf", voicing.frets.join(","));
+      if (voicing.baseFret != null) params.set("vb", String(voicing.baseFret));
+    }
+    window.location.href = "chords.html?" + params.toString();
+  }
+
   function renderChordGrid(container, chords, isSeventh) {
     container.textContent = "";
     chords.forEach((c) => {
@@ -850,7 +914,18 @@ if (typeof document !== "undefined") {
         diagram.innerHTML = '<span class="voicing-meta">无指法</span>';
       }
 
-      cell.append(roman, symbol, diagram);
+      // 「查看详情」按钮：跳转至 chords.html，复刻探索模式跳转逻辑
+      const detailBtn = document.createElement("button");
+      detailBtn.type = "button";
+      detailBtn.className = "chord-cell-detail-btn";
+      detailBtn.textContent = "查看详情 →";
+      detailBtn.setAttribute("aria-label", `在和弦速查页查看 ${c.symbol} 详情`);
+      detailBtn.addEventListener("click", (e) => {
+        e.stopPropagation(); // 不触发 cell 的高亮逻辑
+        jumpToChordDetail(c, v);
+      });
+
+      cell.append(roman, symbol, diagram, detailBtn);
       cell.addEventListener("click", () => toggleChordHighlight(c, cell));
       cell.addEventListener("keydown", (e) => {
         if (e.key === "Enter" || e.key === " ") {
