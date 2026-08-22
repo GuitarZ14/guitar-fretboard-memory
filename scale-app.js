@@ -548,25 +548,35 @@ if (typeof document !== "undefined") {
     scaleId: "major",
     tuningId: "standard",
     accidental: "sharp",
-    frets: 12,
-    octaves: 1,
-    tempo: 380,
+    startFret: 0,
+    endFret: 12,
     labelMode: "note",
     handed: "right",
   };
+
+  function clampFret(n) {
+    return Math.max(0, Math.min(24, Math.round(n) || 0));
+  }
 
   function loadState() {
     try {
       const saved = JSON.parse(localStorage.getItem(STORAGE_KEY));
       if (saved && typeof saved === "object") {
+        // 兼容旧版：旧版保存的是 frets（12/22），新版拆为 startFret/endFret
+        let startFret = clampFret(saved.startFret);
+        let endFret = clampFret(saved.endFret);
+        if (Number.isFinite(saved.frets) && !Number.isFinite(saved.startFret)) {
+          startFret = 0;
+          endFret = clampFret(saved.frets);
+        }
+        if (startFret > endFret) [startFret, endFret] = [endFret, startFret];
         return {
           root: Number.isFinite(saved.root) ? saved.root % 12 : DEFAULT_STATE.root,
           scaleId: SCALE_TYPE_MAP[saved.scaleId] ? saved.scaleId : DEFAULT_STATE.scaleId,
           tuningId: TUNINGS[saved.tuningId] ? saved.tuningId : DEFAULT_STATE.tuningId,
           accidental: saved.accidental === "flat" ? "flat" : "sharp",
-          frets: saved.frets === 22 ? 22 : 12,
-          octaves: saved.octaves === 2 ? 2 : 1,
-          tempo: [240, 380, 620].includes(saved.tempo) ? saved.tempo : DEFAULT_STATE.tempo,
+          startFret,
+          endFret,
           labelMode: saved.labelMode === "degree" ? "degree" : "note",
           handed: saved.handed === "left" ? "left" : "right",
         };
@@ -589,7 +599,7 @@ if (typeof document !== "undefined") {
       { frets: [-1, 3, 2, 0, 1, 0], typeId: "major", rootStrings: [1, 4] },      // I   C
       { frets: [-1, 5, 7, 7, 6, 5], typeId: "minor", rootStrings: [1, 3] },      // ii  Dm
       { frets: [0, 2, 2, 0, 0, 0], typeId: "minor", rootStrings: [0, 2, 5] },    // iii Em
-      { frets: [8, 10, 10, 9, 8, 8], typeId: "major", rootStrings: [0, 2, 5] },  // IV  F
+      { frets: [-1, 8, 10, 10, 10, 8], typeId: "major", rootStrings: [1, 3] },   // IV  F
       { frets: [-1, 10, 9, 7, 8, 7], typeId: "major", rootStrings: [1, 4] },     // V   G
       { frets: [-1, 0, 2, 2, 1, 0], typeId: "minor", rootStrings: [1, 3] },      // vi  Am
       { frets: [-1, 2, 3, 4, 3, 1], typeId: "dim", rootStrings: [1, 3] },        // vii° Bdim
@@ -598,7 +608,7 @@ if (typeof document !== "undefined") {
       { frets: [-1, 3, 2, 0, 0, 0], typeId: "maj7", rootStrings: [1] },          // Imaj7   Cmaj7
       { frets: [-1, 5, 7, 5, 6, 5], typeId: "m7", rootStrings: [1] },            // ii7     Dm7
       { frets: [0, 2, 0, 0, 0, 0], typeId: "m7", rootStrings: [0, 5] },          // iii7    Em7
-      { frets: [8, 10, 9, 9, 8, 8], typeId: "maj7", rootStrings: [0, 2, 5] },    // IVmaj7  Fmaj7
+      { frets: [-1, 8, 10, 9, 10, 8], typeId: "maj7", rootStrings: [1, 5] },    // IVmaj7  Fmaj7
       { frets: [-1, 10, 9, 7, 6, 7], typeId: "7", rootStrings: [1] },            // V7      G7
       { frets: [-1, 0, 2, 0, 1, 3], typeId: "m7", rootStrings: [1, 3] },         // vi7     Am7
       { frets: [-1, 2, 3, 2, 3, 1], typeId: "m7b5", rootStrings: [1] },          // vii7b5  Bm7b5
@@ -614,7 +624,7 @@ if (typeof document !== "undefined") {
     const rootStrings = [];
     for (let si = 0; si < 6; si += 1) {
       const f = frets[si];
-      if (f >= 0 && mod12(tuningPitches[si] + f) === rootSemi) {
+      if (f >= 0 && scaleMod12(tuningPitches[si] + f) === rootSemi) {
         rootStrings.push(si);
       }
     }
@@ -635,9 +645,11 @@ if (typeof document !== "undefined") {
     tuningSelect: document.querySelector("#tuningSelect"),
     tuningDesc: document.querySelector("#tuningDesc"),
     accidentalSwitch: document.querySelector("#accidentalSwitch"),
-    rangeSwitch: document.querySelector("#rangeSwitch"),
-    octaveSwitch: document.querySelector("#octaveSwitch"),
-    tempoSwitch: document.querySelector("#tempoSwitch"),
+    fretRangeMinInput: document.querySelector("#fretRangeMinInput"),
+    fretRangeMaxInput: document.querySelector("#fretRangeMaxInput"),
+    fretRangeFill: document.querySelector("#fretRangeFill"),
+    fretRangeMin: document.querySelector("#fretRangeMin"),
+    fretRangeMax: document.querySelector("#fretRangeMax"),
     scaleName: document.querySelector("#scaleName"),
     scaleEn: document.querySelector("#scaleEn"),
     noteChips: document.querySelector("#noteChips"),
