@@ -709,12 +709,9 @@ function renderVoicings() {
         <p class="picker-hint">点击下方指板任意位置可加/取消选音，再次点击同一位置取消。</p>
       </div>
       <div class="fretboard-scroll" id="fretboardScroll">
-        <div class="fretboard-part" id="fretboardPartLow">${buildFullFretboardSVG(type, tuning, { start: 0, end: 12, leftPad: 40, showNames: true, pickedPositions })}</div>
-        <div class="fretboard-more" id="fretboardMore">
-          <span class="fretboard-more-arrow">向右滑动 →</span>
-          <span class="fretboard-more-text">加载 13–24 品</span>
-        </div>
+        <div class="fretboard-part" id="fretboardPartLow">${buildFullFretboardSVG(type, tuning, { start: 0, end: 24, leftPad: 40, showNames: true, pickedPositions })}</div>
       </div>
+      <p class="fretboard-scroll-hint">← 横向滑动浏览全部 24 品 →</p>
       <div class="picker-matches">
         <h3 class="picker-matches-title">匹配和弦 <span class="picker-matches-count">${matches.length}</span></h3>
         <div class="voicing-grid picker-grid">${matchCards}</div>
@@ -722,20 +719,6 @@ function renderVoicings() {
 
     document.getElementById("pickerClearBtn").addEventListener("click", clearPicked);
 
-    const scroll = document.getElementById("fretboardScroll");
-    const lowPart = document.getElementById("fretboardPartLow");
-    if (scroll && lowPart) {
-      scroll.style.maxWidth = lowPart.offsetWidth + "px";
-      let highLoaded = false;
-      scroll.addEventListener("scroll", () => {
-        if (highLoaded) return;
-        const max = scroll.scrollWidth - scroll.clientWidth;
-        if (max > 0 && scroll.scrollLeft >= max - 60) {
-          highLoaded = true;
-          loadHighFretboardPicker();
-        }
-      });
-    }
 
     elements.voicingHint.classList.add("visible");
     elements.voicingHintText.textContent = `已选 ${pickedPcs.length} 音 · 匹配 ${matches.length} 个和弦`;
