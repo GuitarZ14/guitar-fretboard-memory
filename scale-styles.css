@@ -171,6 +171,52 @@
   margin: 0 auto;
 }
 
+/* 品格区间双滑块（指板范围） */
+.fret-range-slider { margin-top: 10px; }
+.range-values {
+  display: flex; align-items: baseline; justify-content: center; gap: 4px; margin-bottom: 10px;
+  font-size: 20px; font-weight: 800; color: var(--text);
+}
+.range-values span:nth-child(1),
+.range-values span:nth-child(3) { display: inline-block; min-width: 28px; text-align: center; }
+.range-values span:nth-child(4) { font-size: 11px; font-weight: 700; opacity: 0.8; color: var(--text-3); }
+
+.range-track-wrap { position: relative; height: 32px; margin: 0 8px; }
+.range-track-bg,
+.range-track-fill {
+  position: absolute; top: 50%; left: 0; right: 0; height: 8px; margin-top: -4px;
+  background: var(--surface); border: 2px solid rgba(255, 255, 255, 0.85); border-radius: var(--radius-pill);
+  box-shadow: inset 2px 2px 4px rgba(0, 0, 0, 0.07), inset -2px -2px 4px rgba(255, 255, 255, 0.8);
+}
+.range-track-fill { right: auto; background: linear-gradient(90deg, #9bc5d9, #d6d6ea); border: 0; box-shadow: none; }
+
+.range-track-wrap input[type="range"] {
+  position: absolute; top: 0; left: -8px; width: calc(100% + 16px); height: 100%;
+  margin: 0; padding: 0; background: transparent;
+  -webkit-appearance: none; appearance: none; pointer-events: none;
+}
+.range-track-wrap input[type="range"]::-webkit-slider-runnable-track { height: 8px; background: transparent; }
+.range-track-wrap input[type="range"]::-moz-range-track { height: 8px; background: transparent; }
+.range-track-wrap input[type="range"]::-webkit-slider-thumb {
+  position: relative; z-index: 2; width: 22px; height: 32px; margin-top: -12px;
+  background: #ffffff; border: 2px solid rgba(255, 255, 255, 0.9); border-radius: 8px;
+  box-shadow: 3px 3px 6px rgba(0, 0, 0, 0.18);
+  cursor: pointer; pointer-events: auto; -webkit-appearance: none; appearance: none;
+  transition: transform .12s ease;
+}
+.range-track-wrap input[type="range"]::-moz-range-thumb {
+  width: 22px; height: 32px; background: #ffffff; border: 2px solid rgba(255, 255, 255, 0.9); border-radius: 8px;
+  box-shadow: 3px 3px 6px rgba(0, 0, 0, 0.18); cursor: pointer; pointer-events: auto;
+}
+.range-track-wrap input[type="range"]:active::-webkit-slider-thumb { transform: scale(1.12); }
+.range-track-wrap input[type="range"]:focus-visible::-webkit-slider-thumb { outline: 3px solid var(--purple-400); outline-offset: 2px; }
+.range-track-wrap input[type="range"]:focus-visible::-moz-range-thumb { outline: 3px solid var(--purple-400); outline-offset: 2px; }
+
+.range-labels { display: flex; justify-content: space-between; margin-top: 4px; padding: 0 8px; font-size: 10px; font-weight: 700; color: var(--text-3); }
+
+/* 选中品位区间高亮带 */
+.fb-range-band { pointer-events: none; }
+
 /* 移动端：顺阶和弦网格多列铺满 */
 @media (max-width: 760px) {
   .hero-card .chord-name-card span { font-size: 30px; }

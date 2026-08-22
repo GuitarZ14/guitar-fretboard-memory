@@ -212,6 +212,7 @@ function scaleFretX(L, fret) {
 /* ===================== 指板 SVG（音阶） ===================== */
 function buildScaleFretboardSVG(root, scaleType, tuning, opts = {}) {
   const frets = opts.frets ?? 12;
+  const startFret = Math.max(0, Math.min(frets, Number(opts.startFret) || 0));
   const labelMode = opts.labelMode ?? "note"; // note | degree
   const accidental = opts.accidental ?? "sharp";
   const highlight = opts.highlight || null; // Set<number> 或数组（pitch class）
@@ -263,6 +264,15 @@ function buildScaleFretboardSVG(root, scaleType, tuning, opts = {}) {
     parts.push(`<circle cx="${x}" cy="${pad.t + 2.5 * rowH}" r="6" fill="rgba(120,120,140,0.35)"/>`);
     parts.push(`<circle cx="${x}" cy="${pad.t + 4.5 * rowH}" r="6" fill="rgba(120,120,140,0.35)"/>`);
   });
+
+  // 选中品位区间高亮带（起始品 > 0 时绘制，覆盖 startFret..endFret）
+  if (startFret > 0) {
+    const bx0 = leftPad + startFret * colW;
+    const bx1 = leftPad + frets * colW;
+    parts.push(
+      `<rect class="fb-range-band" x="${bx0}" y="${pad.t}" width="${bx1 - bx0}" height="${6 * rowH}" rx="10" fill="rgba(155,197,217,0.18)" stroke="rgba(155,197,217,0.55)" stroke-width="2"/>`
+    );
+  }
 
   positions.forEach((p) => {
     const x = scaleFretX(L, p.fret);
@@ -412,7 +422,7 @@ function buildScaleVoicingSVG(v, type, tuning, opts = {}) {
 }
 
 /* ===================== 升序播放序列（指板运行） ===================== */
-function buildScaleRun(root, scaleType, tuning, octaves) {
+function buildScaleRun(root, scaleType, tuning) {
   const ivals = scaleType.intervals;
   const n = ivals.length;
   const positions = fretboardPositions(root, { intervals: ivals }, tuning.pitches, { frets: 24 })
@@ -430,7 +440,7 @@ function buildScaleRun(root, scaleType, tuning, octaves) {
 
   const run = [startPool[0]];
   let prev = startPool[0];
-  const steps = n * (octaves || 1);
+  const steps = n;
   for (let k = 1; k <= steps; k += 1) {
     const targetSemi = scaleMod12(root + (k < steps ? ivals[k % n] : 0));
     const cands = positions
@@ -760,9 +770,10 @@ if (typeof document !== "undefined") {
   /* ---------- 渲染指板 ---------- */
   function renderFretboard() {
     const sc = currentScale();
-    const frets = state.frets;
+    const frets = state.endFret;
     const svg = buildScaleFretboardSVG(state.root, sc, currentTuning(), {
       frets,
+      startFret: state.startFret,
       labelMode: state.labelMode,
       accidental: state.accidental,
       highlight: highlightSet,
@@ -898,7 +909,7 @@ if (typeof document !== "undefined") {
   function flashNote(si, fret) {
     const svg = els.fretboard.querySelector("svg");
     if (!svg) return;
-    const L = scaleFbLayout(state.frets);
+    const L = scaleFbLayout(state.endFret);
     const order = L.order;
     const row = order.indexOf(si);
     if (row < 0) return;
@@ -967,7 +978,7 @@ if (typeof document !== "undefined") {
   function playScale() {
     if (isPlaying) { stopScale(); return; }
     const sc = currentScale();
-    const run = buildScaleRun(state.root, sc, currentTuning(), state.octaves);
+    const run = buildScaleRun(state.root, sc, currentTuning());
     if (!run.length) return;
     isPlaying = true;
     updatePlayButton();
@@ -978,7 +989,7 @@ if (typeof document !== "undefined") {
         scaleAudioEngine.play(currentTuning(), p.si, p.fret);
         flashNote(p.si, p.fret);
         if (idx === run.length - 1) finishScale();
-      }, idx * state.tempo);
+      }, idx * 420);
       playTimers.push(id);
     });
   }
@@ -988,6 +999,37 @@ if (typeof document !== "undefined") {
     renderHero();
     renderFretboard();
     renderDiatonic();
+  }
+
+  /* ---------- 指板范围双滑块 ---------- */
+  const SCALE_MAX_FRET = 24;
+  function renderFretRangeInputs() {
+    const min = state.startFret;
+    const max = state.endFret;
+    els.fretRangeMinInput.value = String(min);
+    els.fretRangeMaxInput.value = String(max);
+    els.fretRangeMin.textContent = String(min);
+    els.fretRangeMax.textContent = String(max);
+    const minPercent = (min / SCALE_MAX_FRET) * 100;
+    const maxPercent = (max / SCALE_MAX_FRET) * 100;
+    els.fretRangeFill.style.left = `${minPercent}%`;
+    els.fretRangeFill.style.width = `${maxPercent - minPercent}%`;
+  }
+  function onFretRangeInput(event) {
+    let min = Number(els.fretRangeMinInput.value);
+    let max = Number(els.fretRangeMaxInput.value);
+    // 防止两端交叉：拖动端对齐到另一端
+    if (event.target === els.fretRangeMinInput && min > max) max = min;
+    else if (event.target === els.fretRangeMaxInput && max < min) min = max;
+    min = Math.max(0, Math.min(SCALE_MAX_FRET, min));
+    max = Math.max(0, Math.min(SCALE_MAX_FRET, max));
+    if (min > max) [min, max] = [max, min];
+    if (state.startFret === min && state.endFret === max) return;
+    state.startFret = min;
+    state.endFret = max;
+    renderFretRangeInputs();
+    saveState();
+    renderFretboard();
   }
 
   /* ---------- 事件绑定 ---------- */
@@ -1009,30 +1051,8 @@ if (typeof document !== "undefined") {
       renderAll();
     });
 
-    els.rangeSwitch.addEventListener("click", (e) => {
-      const btn = e.target.closest("button[data-range]");
-      if (!btn) return;
-      state.frets = Number(btn.dataset.range);
-      refreshSegmented(els.rangeSwitch, "range", state.frets);
-      saveState();
-      renderFretboard();
-    });
-
-    els.octaveSwitch.addEventListener("click", (e) => {
-      const btn = e.target.closest("button[data-oct]");
-      if (!btn) return;
-      state.octaves = Number(btn.dataset.oct);
-      refreshSegmented(els.octaveSwitch, "oct", state.octaves);
-      saveState();
-    });
-
-    els.tempoSwitch.addEventListener("click", (e) => {
-      const btn = e.target.closest("button[data-tempo]");
-      if (!btn) return;
-      state.tempo = Number(btn.dataset.tempo);
-      refreshSegmented(els.tempoSwitch, "tempo", state.tempo);
-      saveState();
-    });
+    els.fretRangeMinInput.addEventListener("input", onFretRangeInput);
+    els.fretRangeMaxInput.addEventListener("input", onFretRangeInput);
 
     els.labelSwitch.addEventListener("click", (e) => {
       const btn = e.target.closest("button[data-label]");
@@ -1068,9 +1088,7 @@ if (typeof document !== "undefined") {
 
     // 初次加载：应用已保存的分段状态
     refreshSegmented(els.accidentalSwitch, "acc", state.accidental);
-    refreshSegmented(els.rangeSwitch, "range", state.frets);
-    refreshSegmented(els.octaveSwitch, "oct", state.octaves);
-    refreshSegmented(els.tempoSwitch, "tempo", state.tempo);
+    renderFretRangeInputs();
     refreshSegmented(els.labelSwitch, "label", state.labelMode);
   }
 

@@ -116,9 +116,11 @@ function seedSegmented(id, attr, values) {
   const container = getEl(id);
   values.forEach((v) => container.append(mkSegBtn(attr, v)));
 }
-seedSegmented("#rangeSwitch", "range", ["12", "22"]);
-seedSegmented("#octaveSwitch", "oct", ["1", "2"]);
-seedSegmented("#tempoSwitch", "tempo", ["620", "380", "240"]);
+// 双滑块（模拟 scales.html 的 <input type="range"> 默认值）
+bySel["#fretRangeMinInput"] = getEl("#fretRangeMinInput");
+bySel["#fretRangeMaxInput"] = getEl("#fretRangeMaxInput");
+bySel["#fretRangeMinInput"].value = "0";
+bySel["#fretRangeMaxInput"].value = "12";
 seedSegmented("#accidentalSwitch", "acc", ["sharp", "flat"]);
 seedSegmented("#labelSwitch", "label", ["note", "degree"]);
 
@@ -227,44 +229,44 @@ try {
   fireEvent(bySel["#playButton"], "click"); // 立即停止（清空定时器）
   console.log("✓ 播放/停止：无异常，定时器已清理");
 
-  /* ---- 交互 5：指板范围 12→22 品 ---- */
-  const rangeBtns = bySel["#rangeSwitch"].querySelectorAll("button");
-  const r22 = rangeBtns.find((b) => b.dataset.range === "22");
+  /* ---- 交互 5：拖动“结束品”滑块 12→22 品 ---- */
+  const maxInput = bySel["#fretRangeMaxInput"];
+  const minInput = bySel["#fretRangeMinInput"];
   const fbBefore = bySel["#scaleFretboard"].innerHTML;
-  fireEvent(bySel["#rangeSwitch"], "click", r22);
+  maxInput.value = "22";
+  fireEvent(maxInput, "input", maxInput);
   const fbAfter = bySel["#scaleFretboard"].innerHTML;
-  assert.ok(fbBefore !== fbAfter, "切换指板范围后指板 SVG 应重新渲染");
-  assert.ok(r22.classList.contains("active"), "22 品按钮应高亮");
-  assert.ok(!rangeBtns.find((b) => b.dataset.range === "12").classList.contains("active"), "12 品按钮应取消高亮");
-  assert.ok(JSON.parse(localStorageStub._d["guitar-scale-practice-settings"]).frets === 22, "frets 应持久化为 22");
-  // 22 品 SVG 宽度应大于 12 品
+  assert.ok(fbBefore !== fbAfter, "拖动结束品滑块后指板 SVG 应重新渲染");
+  const saved5 = JSON.parse(localStorageStub._d["guitar-scale-practice-settings"]);
+  assert.strictEqual(saved5.endFret, 22, "endFret 应持久化为 22");
+  assert.strictEqual(saved5.startFret, 0, "startFret 应保持为 0");
   const w22 = Number(/width="(\d+)"/.exec(fbAfter)[1]);
   const w12 = Number(/width="(\d+)"/.exec(fbBefore)[1]);
   assert.ok(w22 > w12, `22 品指板宽度应更大（${w12} → ${w22}）`);
-  console.log(`✓ 指板范围切换：12→22 品生效，SVG 宽度 ${w12}→${w22}`);
+  console.log(`✓ 指板范围滑块：结束品 12→22 生效，SVG 宽度 ${w12}→${w22}`);
 
-  /* ---- 交互 6：音阶跨度 1→2 八度 ---- */
-  const octBtns = bySel["#octaveSwitch"].querySelectorAll("button");
-  const oct2 = octBtns.find((b) => b.dataset.oct === "2");
-  fireEvent(bySel["#octaveSwitch"], "click", oct2);
-  assert.ok(oct2.classList.contains("active"), "2 八度按钮应高亮");
-  assert.strictEqual(JSON.parse(localStorageStub._d["guitar-scale-practice-settings"]).octaves, 2, "octaves 应保存为 2");
-  console.log("✓ 音阶跨度切换：1→2 八度 状态已更新");
+  /* ---- 交互 6：拖动“起始品”滑块 0→5 品，并验证高亮带 ---- */
+  minInput.value = "5";
+  fireEvent(minInput, "input", minInput);
+  const saved6 = JSON.parse(localStorageStub._d["guitar-scale-practice-settings"]);
+  assert.strictEqual(saved6.startFret, 5, "startFret 应持久化为 5");
+  assert.strictEqual(saved6.endFret, 22, "endFret 应保持为 22");
+  const fbBand = bySel["#scaleFretboard"].innerHTML;
+  assert.ok(fbBand.includes("fb-range-band"), "起始品>0 时指板应绘制选中区间高亮带");
+  // 两端交叉防护：min 拖到超过 max 时应对齐到 max
+  const savedBand = saved6;
+  minInput.value = "99";
+  fireEvent(minInput, "input", minInput);
+  const savedCross = JSON.parse(localStorageStub._d["guitar-scale-practice-settings"]);
+  assert.strictEqual(savedCross.startFret, savedCross.endFret, "起始品超过结束品时应自动对齐（防交叉）");
+  console.log(`✓ 起始品滑块：0→5 生效并绘制高亮带；防交叉校验通过（start=${savedCross.startFret}）`);
 
-  /* ---- 交互 7：播放速度 中→慢 ---- */
-  const tempoBtns = bySel["#tempoSwitch"].querySelectorAll("button");
-  const tSlow = tempoBtns.find((b) => b.dataset.tempo === "620");
-  fireEvent(bySel["#tempoSwitch"], "click", tSlow);
-  assert.ok(tSlow.classList.contains("active"), "慢速按钮应高亮");
-  assert.strictEqual(JSON.parse(localStorageStub._d["guitar-scale-practice-settings"]).tempo, 620, "tempo 应保存为 620");
-  console.log("✓ 播放速度切换：中→慢 状态已更新");
-
-  /* ---- 交互 8：播放序列随 octaves 变化 ---- */
+  /* ---- 交互 7：播放序列为固定一个八度 ---- */
   const st = require("../scale-app.js");
-  const run1 = st.buildScaleRun(0, st.SCALE_TYPE_MAP.major, engine.TUNINGS.standard, 1);
-  const run2 = st.buildScaleRun(0, st.SCALE_TYPE_MAP.major, engine.TUNINGS.standard, 2);
-  assert.ok(run2.length > run1.length, `2 八度播放序列应更长（${run1.length} → ${run2.length}）`);
-  console.log(`✓ 播放序列跨度：1 八度 ${run1.length} 音 → 2 八度 ${run2.length} 音`);
+  const run = st.buildScaleRun(0, st.SCALE_TYPE_MAP.major, engine.TUNINGS.standard);
+  assert.strictEqual(run.length, st.SCALE_TYPE_MAP.major.intervals.length + 1, "播放序列应为一个八度（根音+音阶音级，含首尾同音级）");
+  assert.strictEqual(run[0].semi, run[run.length - 1].semi, "序列首末音应为同音级（八度回归）");
+  console.log(`✓ 播放序列：固定 1 八度，共 ${run.length} 音，首末同音级`);
 
   console.log("\n=== 冒烟测试全部通过 ===");
 } catch (e) {
