@@ -1,9 +1,7 @@
 const { chromium } = require("playwright-core");
 
 const CHROME = "/Users/guitarzry/Library/Caches/ms-playwright/chromium-1234/chrome-mac-arm64/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing";
-const BASE = "http://127.0.0.1:8624";
-
-async function openAndDraw(page, btnSel, cloneSel, tools) {
+const BASE = "http://127.0.0.1:8624";async function openAndDraw(page, btnSel, cloneSel, tools) {
   await page.click(btnSel);
   await page.waitForTimeout(350);
   const box = await page.locator(".fb-fs-canvas").boundingBox();
@@ -35,6 +33,145 @@ async function openAndDraw(page, btnSel, cloneSel, tools) {
   await page.waitForTimeout(150);
   const closed = await page.locator(".fb-fullscreen-overlay.open").count();
   return { open, cloned, strokeCount, closed };
+}
+
+// 修复 1 验证：笔触精确跟随光标（在已知屏幕坐标画点，读回画布像素应命中笔迹颜色）
+async function verifyCoordPrecision(page) {
+  await page.click("#fbFullscreenBtn");
+  await page.waitForTimeout(350);
+  const box = await page.locator(".fb-fs-canvas").boundingBox();
+  await page.click('[data-tool="free"]');
+  // 取画布中心点（确保在指板有效区域内）
+  const cx = box.x + box.width * 0.5;
+  const cy = box.y + box.height * 0.5;
+  await page.mouse.click(cx, cy);
+  await page.waitForTimeout(100);
+  // 通过像素验证：画布 backing store 中点应命中笔迹颜色 #ff5a5a（默认色）
+  const hit = await page.evaluate(([sx, sy]) => {
+    const c = document.querySelector(".fb-fs-canvas");
+    const rect = c.getBoundingClientRect();
+    const lx = (sx - rect.left) * (c.width / rect.width);
+    const ly = (sy - rect.top) * (c.height / rect.height);
+    const data = c.getContext("2d").getImageData(Math.round(lx), Math.round(ly), 1, 1).data;
+    return { r: data[0], g: data[1], b: data[2], a: data[3] };
+  }, [cx, cy]);
+  const matched = hit.r > 200 && hit.g < 120 && hit.b < 120 && hit.a > 100; // #ff5a5a
+  await page.click("#fbFsClear");
+  await page.click("#fbFsExit");
+  await page.waitForTimeout(120);
+  return { cx, cy, hit, matched };
+}
+
+// 修复 2 验证：橡皮擦可擦除已有笔迹（像素从有色变为透明）
+async function verifyEraser(page) {
+  await page.click("#fbFullscreenBtn");
+  await page.waitForTimeout(350);
+  const box = await page.locator(".fb-fs-canvas").boundingBox();
+  const cx = box.x + box.width * 0.5;
+  const cy = box.y + box.height * 0.5;
+  // 先画一条粗线
+  await page.click('[data-tool="free"]');
+  await page.evaluate(() => { const s = document.querySelector(".fb-fs-size"); s.value = 20; s.dispatchEvent(new Event("input", { bubbles: true })); });
+  await page.mouse.move(cx - 60, cy);
+  await page.mouse.down();
+  await page.mouse.move(cx + 60, cy, { steps: 8 });
+  await page.mouse.up();
+  // 读取画线后的像素（应为有色）
+  const before = await page.evaluate(([sx, sy]) => {
+    const c = document.querySelector(".fb-fs-canvas");
+    const rect = c.getBoundingClientRect();
+    const lx = (sx - rect.left) * (c.width / rect.width);
+    const ly = (sy - rect.top) * (c.height / rect.height);
+    return [...c.getContext("2d").getImageData(Math.round(lx), Math.round(ly), 1, 1).data];
+  }, [cx, cy]);
+  // 用橡皮擦擦过中心
+  await page.click('[data-tool="eraser"]');
+  await page.evaluate(() => { const s = document.querySelector("#fbFsEraseSize"); s.value = 40; s.dispatchEvent(new Event("input", { bubbles: true })); });
+  const eraseGroupVisible = await page.evaluate(() => {
+    const g = document.querySelector("#fbFsEraserSizeGroup");
+    return g && g.style.display !== "none" && getComputedStyle(g).display !== "none";
+  });
+  await page.mouse.move(cx - 80, cy);
+  await page.mouse.down();
+  await page.mouse.move(cx + 80, cy, { steps: 8 });
+  await page.mouse.up();
+  await page.waitForTimeout(100);
+  const after = await page.evaluate(([sx, sy]) => {
+    const c = document.querySelector(".fb-fs-canvas");
+    const rect = c.getBoundingClientRect();
+    const lx = (sx - rect.left) * (c.width / rect.width);
+    const ly = (sy - rect.top) * (c.height / rect.height);
+    return [...c.getContext("2d").getImageData(Math.round(lx), Math.round(ly), 1, 1).data];
+  }, [cx, cy]);
+  const erased = after[3] < before[3]; // 擦除后 alpha 下降（变透明）
+  const strokes = await page.evaluate(() => window.FretboardAnnotate._strokeCount());
+  await page.click("#fbFsClear");
+  await page.click("#fbFsExit");
+  await page.waitForTimeout(120);
+  return { before, after, erased, strokes, eraseGroupVisible };
+}
+
+// 修复 3 验证：文字工具点击后出现输入框并可成功添加文字
+async function verifyTextTool(page) {
+  await page.click("#fbFullscreenBtn");
+  await page.waitForTimeout(350);
+  const box = await page.locator(".fb-fs-canvas").boundingBox();
+  await page.click('[data-tool="text"]');
+  const activeTool = await page.evaluate(() => {
+    const b = document.querySelector("#fbFsTools [data-tool].active");
+    return b ? b.dataset.tool : null;
+  });
+  await page.mouse.click(box.x + box.width * 0.4, box.y + box.height * 0.45);
+  await page.waitForTimeout(120);
+  const inputCount = await page.locator(".fb-fs-text-input").count();
+  const inputFocused = await page.evaluate(() => {
+    const el = document.querySelector(".fb-fs-text-input");
+    return !!el && document.activeElement === el;
+  });
+  await page.keyboard.type("C 大调");
+  await page.keyboard.press("Enter");
+  await page.waitForTimeout(120);
+  const inputGone = await page.locator(".fb-fs-text-input").count();
+  const strokes = await page.evaluate(() => {
+    const n = window.FretboardAnnotate._strokeCount();
+    return n;
+  });
+  await page.click("#fbFsClear");
+  await page.click("#fbFsExit");
+  await page.waitForTimeout(120);
+  return { box, activeTool, inputCount, inputFocused, inputGone, strokes };
+}
+
+// 修复 2 验证：截图工具框选区域并导出 PNG 下载
+async function verifyScreenshot(page) {
+  const downloadPromise = page.waitForEvent("download", { timeout: 4000 }).catch(() => null);
+  await page.click("#fbFullscreenBtn");
+  await page.waitForTimeout(350);
+  const box = await page.locator(".fb-fs-canvas").boundingBox();
+  await page.click('[data-tool="shot"]');
+  await page.mouse.move(box.x + box.width * 0.25, box.y + box.height * 0.3);
+  await page.mouse.down();
+  await page.mouse.move(box.x + box.width * 0.7, box.y + box.height * 0.7, { steps: 8 });
+  await page.mouse.up();
+  await page.waitForTimeout(400);
+  const download = await downloadPromise;
+  let downloadName = null;
+  let downloadSize = 0;
+  if (download) {
+    downloadName = download.suggestedFilename();
+    const path = await download.path().catch(() => null);
+    if (path) {
+      const fs = require("fs");
+      downloadSize = fs.statSync(path).size;
+    }
+  }
+  const toast = await page.evaluate(() => {
+    const t = document.querySelector(".fb-fs-toast");
+    return t ? t.textContent : null;
+  });
+  await page.click("#fbFsExit");
+  await page.waitForTimeout(120);
+  return { downloadName, downloadSize, toast };
 }
 
 (async () => {
@@ -76,7 +213,22 @@ async function openAndDraw(page, btnSel, cloneSel, tools) {
   const mobileToolbarVisible = await page.locator(".fb-fs-toolbar").isVisible();
   await page.click("#fbFsExit");
 
-  console.log(JSON.stringify({ index, scales, chords, chordView, mobileOpen, mobileToolbarVisible, errors }, null, 2));
+  // 5) 修复验证：坐标精确性（笔触跟手）— 音阶页 SVG 指板（恢复桌面视口）
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto(`${BASE}/scales.html?v=5`, { waitUntil: "networkidle" });
+  await page.waitForSelector("#scaleFretboard svg", { timeout: 5000 });
+  const coordPrec = await verifyCoordPrecision(page);
+
+  // 6) 修复验证：橡皮擦像素级擦除
+  const eraser = await verifyEraser(page);
+
+  // 7) 修复验证：文字工具唤起输入并成文
+  const textTool = await verifyTextTool(page);
+
+  // 8) 修复验证：截图框选导出 PNG
+  const shot = await verifyScreenshot(page);
+
+  console.log(JSON.stringify({ index, scales, chords, chordView, mobileOpen, mobileToolbarVisible, coordPrec, eraser, textTool, shot, errors }, null, 2));
 
   const ok =
     index.open === 1 && index.cloned === 1 && index.strokeCount >= 2 && index.closed === 0 &&
@@ -84,8 +236,13 @@ async function openAndDraw(page, btnSel, cloneSel, tools) {
     chords.open === 1 && chords.cloned === 1 && chords.strokeCount >= 2 && chords.closed === 0 &&
     chordView === true &&
     mobileOpen === 1 && mobileToolbarVisible === true &&
+    coordPrec.matched === true &&
+    eraser.erased === true && eraser.eraseGroupVisible === true &&
+    textTool.inputCount === 1 && textTool.inputFocused === true &&
+    textTool.inputGone === 0 && textTool.strokes >= 1 &&
+    shot.downloadName && shot.downloadName.endsWith(".png") && shot.downloadSize > 500 &&
     errors.length === 0;
   await browser.close();
   if (!ok) { console.error("ANNOTATE CHECK FAILED"); process.exit(1); }
-  console.log("ANNOTATE CHECK PASSED (all pages)");
+  console.log("ANNOTATE CHECK PASSED (all pages + fixes)");
 })().catch((e) => { console.error(e); process.exit(1); });

@@ -17,6 +17,8 @@
     arrow: { icon: "↗", label: "箭头" },
     text: { icon: "T", label: "文字" },
     highlight: { icon: "⦿", label: "高亮" },
+    eraser: { icon: "⌫", label: "橡皮擦" },
+    shot: { icon: "▣", label: "截图" },
   };
 
   let overlay = null;
@@ -38,11 +40,14 @@
     color: COLORS[0],
     size: 4,
     strokes: [], // 已完成标注 {type,color,size,points?|text?|x,y?|...}
+    eraseWidth: 12, // 橡皮擦范围
   };
 
   let drawing = null; // 当前正在绘制的标注
   let pointers = new Map(); // pointerId -> {x,y}
   let lastPinchDist = 0;
+  let shotSel = null; // 截图框选 {x0,y0,x1,y1}（canvas 本地坐标）
+  let eraserPreview = null; // 橡皮擦预览圆心（canvas 本地坐标）
 
   function buildOverlay() {
     overlay = document.createElement("div");
@@ -71,6 +76,10 @@
         <div class="fb-fs-group" aria-label="笔触大小">
           <span class="fb-fs-label">粗细</span>
           <input type="range" class="fb-fs-size" id="fbFsSize" min="2" max="20" value="4" aria-label="笔触大小" />
+        </div>
+        <div class="fb-fs-group fb-fs-eraser-size" id="fbFsEraserSizeGroup" aria-label="擦除范围">
+          <span class="fb-fs-label">擦除</span>
+          <input type="range" class="fb-fs-size" id="fbFsEraseSize" min="4" max="60" value="12" aria-label="擦除范围" />
         </div>
         <div class="fb-fs-group" aria-label="操作">
           <button type="button" class="fb-fs-tool" id="fbFsUndo" title="撤销">↺</button>
@@ -108,6 +117,12 @@
     // 粗细
     overlay.querySelector("#fbFsSize").addEventListener("input", (e) => {
       state.size = Number(e.target.value);
+      redraw();
+    });
+    // 擦除范围
+    overlay.querySelector("#fbFsEraseSize").addEventListener("input", (e) => {
+      state.eraseWidth = Number(e.target.value);
+      redraw();
     });
     // 撤销 / 清除 / 退出
     overlay.querySelector("#fbFsUndo").addEventListener("click", undo);
@@ -129,6 +144,14 @@
     state.tool = tool;
     overlay.querySelectorAll("[data-tool]").forEach((b) => b.classList.toggle("active", b.dataset.tool === tool));
     stageInner.classList.toggle("text-mode", tool === "text");
+    // 橡皮擦：显示擦除范围控制并隐藏笔触粗细；其余工具反之
+    const eraseGroup = overlay.querySelector("#fbFsEraserSizeGroup");
+    const sizeGroup = overlay.querySelector("#fbFsSize").closest(".fb-fs-group");
+    if (eraseGroup) eraseGroup.style.display = tool === "eraser" ? "flex" : "none";
+    if (sizeGroup) sizeGroup.style.display = tool === "eraser" ? "none" : "flex";
+    shotSel = null;
+    eraserPreview = null;
+    redraw();
   }
 
   function open(sourceSvgEl, title) {
@@ -157,9 +180,8 @@
     panX = 0;
     panY = 0;
 
-    // 等待布局稳定后设置画布尺寸
+    // 等待布局稳定后适配尺寸（fitToStage 内部会先测量克隆尺寸再重建画布）
     requestAnimationFrame(() => {
-      sizeCanvas();
       fitToStage();
       redraw();
     });
@@ -171,6 +193,11 @@
     overlay.classList.remove("open");
     document.body.style.overflow = "";
     document.removeEventListener("keydown", onKey);
+    drawing = null;
+    pointers.clear();
+    shotSel = null;
+    eraserPreview = null;
+    if (textInput) { textInput.remove(); textInput = null; }
   }
 
   function onKey(e) {
@@ -207,6 +234,8 @@
     const sRect = stage.getBoundingClientRect();
     const pad = 0.96;
     baseScale = Math.min((sRect.width * pad) / cloneW, (sRect.height * pad) / cloneH);
+    // 先按真实克隆尺寸重建画布位图，再应用变换
+    sizeCanvas();
     applyTransform();
   }
 
@@ -226,29 +255,79 @@
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     for (const s of state.strokes) drawStroke(s);
     if (drawing) drawStroke(drawing);
+    // 橡皮擦范围预览
+    if (state.tool === "eraser" && eraserPreview) {
+      ctx.save();
+      ctx.globalCompositeOperation = "source-over";
+      ctx.strokeStyle = "rgba(255,255,255,0.9)";
+      ctx.setLineDash([4, 4]);
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.arc(eraserPreview.x, eraserPreview.y, state.eraseWidth / 2, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
+    }
+    // 截图框选
+    if (state.tool === "shot" && shotSel) {
+      const x = Math.min(shotSel.x0, shotSel.x1);
+      const y = Math.min(shotSel.y0, shotSel.y1);
+      const w = Math.abs(shotSel.x1 - shotSel.x0);
+      const h = Math.abs(shotSel.y1 - shotSel.y0);
+      ctx.save();
+      ctx.globalCompositeOperation = "source-over";
+      ctx.fillStyle = "rgba(155,197,217,0.15)";
+      ctx.fillRect(x, y, w, h);
+      ctx.strokeStyle = "#9bc5d9";
+      ctx.setLineDash([6, 4]);
+      ctx.lineWidth = 2;
+      ctx.strokeRect(x, y, w, h);
+      // 显示尺寸
+      ctx.fillStyle = "rgba(255,255,255,0.9)";
+      ctx.font = "12px sans-serif";
+      ctx.textBaseline = "top";
+      ctx.fillText(`${Math.round(w)}×${Math.round(h)}`, x + 6, y + 6);
+      ctx.restore();
+    }
   }
 
-  function drawStroke(s) {
-    ctx.save();
-    ctx.strokeStyle = s.color;
-    ctx.fillStyle = s.color;
-    ctx.lineWidth = s.size;
-    ctx.lineCap = "round";
-    ctx.lineJoin = "round";
+  function drawStroke(s, target) {
+    const c = target || ctx;
+    c.save();
+    c.strokeStyle = s.color;
+    c.fillStyle = s.color;
+    c.lineWidth = s.size;
+    c.lineCap = "round";
+    c.lineJoin = "round";
 
-    if (s.type === "free" || s.type === "highlight") {
+    if (s.type === "eraser") {
+      // 擦除：destination-out 只影响画布上的标注，不影响指板克隆
+      c.globalCompositeOperation = "destination-out";
+      c.lineWidth = s.size;
       const pts = s.points;
-      if (!pts || pts.length === 0) { ctx.restore(); return; }
-      if (s.type === "highlight") ctx.globalAlpha = 0.35;
+      if (!pts || pts.length === 0) { c.restore(); return; }
       if (pts.length === 1) {
-        ctx.beginPath();
-        ctx.arc(pts[0].x, pts[0].y, s.size / 2, 0, Math.PI * 2);
-        ctx.fill();
+        c.beginPath();
+        c.arc(pts[0].x, pts[0].y, s.size / 2, 0, Math.PI * 2);
+        c.fill();
       } else {
-        ctx.beginPath();
-        ctx.moveTo(pts[0].x, pts[0].y);
-        for (let i = 1; i < pts.length; i += 1) ctx.lineTo(pts[i].x, pts[i].y);
-        ctx.stroke();
+        c.beginPath();
+        c.moveTo(pts[0].x, pts[0].y);
+        for (let i = 1; i < pts.length; i += 1) c.lineTo(pts[i].x, pts[i].y);
+        c.stroke();
+      }
+    } else if (s.type === "free" || s.type === "highlight") {
+      const pts = s.points;
+      if (!pts || pts.length === 0) { c.restore(); return; }
+      if (s.type === "highlight") c.globalAlpha = 0.35;
+      if (pts.length === 1) {
+        c.beginPath();
+        c.arc(pts[0].x, pts[0].y, s.size / 2, 0, Math.PI * 2);
+        c.fill();
+      } else {
+        c.beginPath();
+        c.moveTo(pts[0].x, pts[0].y);
+        for (let i = 1; i < pts.length; i += 1) c.lineTo(pts[i].x, pts[i].y);
+        c.stroke();
       }
     } else if (s.type === "circle") {
       const { x0, y0, x1, y1 } = s;
@@ -256,30 +335,30 @@
       const cy = (y0 + y1) / 2;
       const rx = Math.abs(x1 - x0) / 2;
       const ry = Math.abs(y1 - y0) / 2;
-      ctx.beginPath();
-      ctx.ellipse(cx, cy, Math.max(rx, 1), Math.max(ry, 1), 0, 0, Math.PI * 2);
-      ctx.stroke();
+      c.beginPath();
+      c.ellipse(cx, cy, Math.max(rx, 1), Math.max(ry, 1), 0, 0, Math.PI * 2);
+      c.stroke();
     } else if (s.type === "arrow") {
       const { x0, y0, x1, y1 } = s;
       const ang = Math.atan2(y1 - y0, x1 - x0);
       const head = Math.max(10, s.size * 3);
-      ctx.beginPath();
-      ctx.moveTo(x0, y0);
-      ctx.lineTo(x1, y1);
-      ctx.stroke();
-      ctx.beginPath();
-      ctx.moveTo(x1, y1);
-      ctx.lineTo(x1 - head * Math.cos(ang - Math.PI / 6), y1 - head * Math.sin(ang - Math.PI / 6));
-      ctx.lineTo(x1 - head * Math.cos(ang + Math.PI / 6), y1 - head * Math.sin(ang + Math.PI / 6));
-      ctx.closePath();
-      ctx.fill();
+      c.beginPath();
+      c.moveTo(x0, y0);
+      c.lineTo(x1, y1);
+      c.stroke();
+      c.beginPath();
+      c.moveTo(x1, y1);
+      c.lineTo(x1 - head * Math.cos(ang - Math.PI / 6), y1 - head * Math.sin(ang - Math.PI / 6));
+      c.lineTo(x1 - head * Math.cos(ang + Math.PI / 6), y1 - head * Math.sin(ang + Math.PI / 6));
+      c.closePath();
+      c.fill();
     } else if (s.type === "text") {
-      ctx.globalAlpha = 1;
-      ctx.font = `700 ${Math.max(14, s.size * 4)}px var(--font, sans-serif)`;
-      ctx.textBaseline = "middle";
-      ctx.fillText(s.text, s.x, s.y);
+      c.globalAlpha = 1;
+      c.font = `700 ${Math.max(14, s.size * 4)}px "PingFang SC","Microsoft YaHei",system-ui,sans-serif`;
+      c.textBaseline = "middle";
+      c.fillText(s.text, s.x, s.y);
     }
-    ctx.restore();
+    c.restore();
   }
 
   /* ---------- 坐标换算（canvas 内部坐标 = SVG 用户坐标，因为画布与 SVG 同尺寸并通过外层 transform 缩放）---------- */
@@ -306,7 +385,12 @@
       placeText(p);
       return;
     }
-    if (state.tool === "highlight") {
+    if (state.tool === "eraser") {
+      drawing = { type: "eraser", size: state.eraseWidth, points: [p] };
+    } else if (state.tool === "shot") {
+      shotSel = { x0: p.x, y0: p.y, x1: p.x, y1: p.y };
+      drawing = { type: "_shot" };
+    } else if (state.tool === "highlight") {
       drawing = { type: "highlight", color: state.color, size: state.size * 3, points: [p] };
     } else if (state.tool === "free") {
       drawing = { type: "free", color: state.color, size: state.size, points: [p] };
@@ -334,6 +418,13 @@
     }
 
     const p = toCanvasCoords(e);
+
+    // 橡皮擦悬停预览（未绘制时也显示擦除范围圆）
+    if (state.tool === "eraser" && !drawing) {
+      eraserPreview = p;
+      redraw();
+    }
+
     if (!drawing) return;
     if (drawing.type === "_pan") {
       panX = drawing.panX0 + (e.clientX - drawing.x0);
@@ -341,7 +432,13 @@
       applyTransform();
       return;
     }
-    if (drawing.type === "free" || drawing.type === "highlight") {
+    if (drawing.type === "_shot") {
+      shotSel.x1 = p.x;
+      shotSel.y1 = p.y;
+      redraw();
+      return;
+    }
+    if (drawing.type === "free" || drawing.type === "highlight" || drawing.type === "eraser") {
       drawing.points.push(p);
     } else if (drawing.type === "circle" || drawing.type === "arrow") {
       drawing.x1 = p.x;
@@ -353,13 +450,26 @@
   function onPointerUp(e) {
     pointers.delete(e.pointerId);
     if (pointers.size < 2) lastPinchDist = 0;
+    eraserPreview = null;
     if (!drawing) return;
     const d = drawing;
     drawing = null;
 
+    // 截图框选完成：触发导出
+    if (d.type === "_shot") {
+      const w = Math.abs(shotSel.x1 - shotSel.x0);
+      const h = Math.abs(shotSel.y1 - shotSel.y0);
+      if (w >= 6 && h >= 6) {
+        captureRegion(shotSel);
+      }
+      shotSel = null;
+      redraw();
+      return;
+    }
+
     // 过滤无效标注
     let valid = true;
-    if ((d.type === "free" || d.type === "highlight") && (!d.points || d.points.length === 0)) valid = false;
+    if ((d.type === "free" || d.type === "highlight" || d.type === "eraser") && (!d.points || d.points.length === 0)) valid = false;
     if ((d.type === "circle" || d.type === "arrow") && Math.hypot(d.x1 - d.x0, d.y1 - d.y0) < 4) valid = false;
     if (d.type === "_pan") return; // 平移不入库
     if (valid) state.strokes.push(d);
@@ -376,17 +486,19 @@
     if (textInput) textInput.remove();
     const input = document.createElement("input");
     input.type = "text";
-    input.className = "fb-fs-text-input";
+    input.className = "fb-fs-text-input fb-fs-text-input-fixed";
     input.placeholder = "输入批注";
+    // 将 clone 本地坐标映射到屏幕坐标，输入框固定于 overlay 层，避免受舞台 transform 影响
     const rect = canvas.getBoundingClientRect();
-    const scale = rect.width / canvas.offsetWidth || 1;
-    input.style.left = (p.x * scale) + "px";
-    input.style.top = (p.y * scale) + "px";
+    const sx = rect.left + p.x * (rect.width / canvas.offsetWidth);
+    const sy = rect.top + p.y * (rect.height / canvas.offsetHeight);
+    input.style.left = sx + "px";
+    input.style.top = sy + "px";
     input.style.color = state.color;
     input.style.fontSize = Math.max(14, state.size * 4) + "px";
-    stageInner.appendChild(input);
+    overlay.appendChild(input);
     textInput = input;
-    input.focus();
+    requestAnimationFrame(() => input.focus({ preventScroll: true }));
     const commit = () => {
       const txt = input.value.trim();
       if (txt) {
@@ -403,13 +515,139 @@
     });
   }
 
+  /* ---------- 截图导出 ---------- */
+  const SVG_STYLE_PROPS = [
+    "fill", "stroke", "stroke-width", "stroke-opacity", "stroke-dasharray",
+    "stroke-linecap", "stroke-linejoin", "opacity", "font-family", "font-size",
+    "font-weight", "font-style", "text-anchor", "letter-spacing",
+    "dominant-baseline", "color", "paint-order", "display", "visibility",
+  ];
+  const HTML_STYLE_PROPS = [
+    "display", "position", "grid-template-columns", "grid-template-rows",
+    "gap", "padding", "margin", "border", "border-radius", "background",
+    "background-color", "color", "font-family", "font-size", "font-weight",
+    "text-align", "line-height", "min-width", "min-height", "width", "height",
+    "box-sizing", "align-items", "justify-items", "place-items",
+    "flex", "flex-direction", "flex-wrap", "overflow", "transform", "letter-spacing",
+  ];
+
+  // 并行遍历源节点与克隆节点，将计算样式内联到 style 属性（SVG/HTML 通用）
+  function inlineComputedStyles(srcRoot, dstRoot, props) {
+    const stack = [[srcRoot, dstRoot]];
+    while (stack.length) {
+      const [s, d] = stack.pop();
+      if (!d || d.nodeType !== 1) continue;
+      const cs = window.getComputedStyle(s);
+      const parts = [];
+      for (const p of props) {
+        const v = cs.getPropertyValue(p);
+        if (v && v !== "none") parts.push(`${p}: ${v}`);
+      }
+      if (parts.length) d.setAttribute("style", parts.join("; "));
+      for (let i = 0; i < s.children.length; i += 1) stack.push([s.children[i], d.children[i]]);
+    }
+  }
+
+  function svgToDataUrl(svgNode) {
+    const clone = svgNode.cloneNode(true);
+    inlineComputedStyles(svgNode, clone, SVG_STYLE_PROPS);
+    const xml = new XMLSerializer().serializeToString(clone);
+    return "data:image/svg+xml;charset=utf-8," + encodeURIComponent(xml);
+  }
+
+  function htmlToDataUrl(htmlNode, w, h) {
+    const clone = htmlNode.cloneNode(true);
+    inlineComputedStyles(htmlNode, clone, HTML_STYLE_PROPS);
+    clone.setAttribute("xmlns", "http://www.w3.org/1999/xhtml");
+    const svg =
+      `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">` +
+      `<foreignObject width="100%" height="100%">${clone.outerHTML}</foreignObject></svg>`;
+    return "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svg);
+  }
+
+  function rasterizeFretboard() {
+    return new Promise((resolve) => {
+      const clone = getClone();
+      if (!clone) { resolve(null); return; }
+      let dataUrl;
+      try {
+        dataUrl = clone.tagName.toLowerCase() === "svg"
+          ? svgToDataUrl(clone)
+          : htmlToDataUrl(clone, cloneW, cloneH);
+      } catch (e) { resolve(null); return; }
+      const img = new Image();
+      img.onload = () => resolve(img);
+      img.onerror = () => resolve(null);
+      img.src = dataUrl;
+    });
+  }
+
+  function showToast(msg) {
+    let toast = overlay.querySelector(".fb-fs-toast");
+    if (!toast) {
+      toast = document.createElement("div");
+      toast.className = "fb-fs-toast";
+      overlay.appendChild(toast);
+    }
+    toast.textContent = msg;
+    toast.classList.add("show");
+    clearTimeout(showToast._t);
+    showToast._t = setTimeout(() => toast.classList.remove("show"), 2200);
+  }
+
+  // 框选区域导出 PNG：指板克隆光栅化 + 标注叠加 + 裁剪下载
+  function captureRegion(sel) {
+    const x = Math.min(sel.x0, sel.x1);
+    const y = Math.min(sel.y0, sel.y1);
+    const w = Math.abs(sel.x1 - sel.x0);
+    const h = Math.abs(sel.y1 - sel.y0);
+    if (w < 4 || h < 4) return;
+
+    const scale = Math.max(2, window.devicePixelRatio || 1); // 高分辨率导出
+    const off = document.createElement("canvas");
+    off.width = Math.max(1, Math.round(cloneW * scale));
+    off.height = Math.max(1, Math.round(cloneH * scale));
+    const octx = off.getContext("2d");
+    octx.setTransform(scale, 0, 0, scale, 0, 0);
+
+    rasterizeFretboard().then((img) => {
+      if (img) octx.drawImage(img, 0, 0, cloneW, cloneH);
+
+      // 标注单独一层绘制（橡皮擦 destination-out 只擦标注），再与指板合成
+      const anno = document.createElement("canvas");
+      anno.width = off.width;
+      anno.height = off.height;
+      const actx = anno.getContext("2d");
+      actx.setTransform(scale, 0, 0, scale, 0, 0);
+      for (const s of state.strokes) drawStroke(s, actx);
+      octx.drawImage(anno, 0, 0);
+
+      // 裁剪选中区域
+      const crop = document.createElement("canvas");
+      crop.width = Math.max(1, Math.round(w * scale));
+      crop.height = Math.max(1, Math.round(h * scale));
+      const cctx = crop.getContext("2d");
+      cctx.drawImage(off, x * scale, y * scale, w * scale, h * scale, 0, 0, crop.width, crop.height);
+
+      const a = document.createElement("a");
+      a.href = crop.toDataURL("image/png");
+      a.download = `fretboard-annotate-${Date.now()}.png`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      showToast("截图已导出");
+    });
+  }
+
   /* ---------- 操作 ---------- */
   function undo() {
     state.strokes.pop();
+    shotSel = null;
     redraw();
   }
   function clearAll() {
     state.strokes = [];
+    shotSel = null;
     redraw();
   }
 
@@ -423,7 +661,6 @@
   // 窗口尺寸变化时重新适配
   function onResize() {
     if (!overlay || !overlay.classList.contains("open")) return;
-    sizeCanvas();
     fitToStage();
   }
   window.addEventListener("resize", onResize);

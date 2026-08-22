@@ -123,6 +123,8 @@
   background: rgba(255, 255, 255, 0.25);
   outline: none;
 }
+/* 擦除范围：默认隐藏，选中橡皮擦时显示 */
+.fb-fs-eraser-size { display: none; }
 .fb-fs-size::-webkit-slider-thumb {
   -webkit-appearance: none; appearance: none;
   width: 18px; height: 18px; border-radius: 50%;
@@ -191,6 +193,11 @@
   outline: none;
   transform: translate(-50%, -50%);
 }
+.fb-fs-text-input-fixed {
+  position: fixed;
+  left: 0;
+  top: 0;
+}
 
 .fb-fs-hint {
   flex: 0 0 auto;
@@ -199,6 +206,26 @@
   color: rgba(244, 246, 251, 0.5);
   padding: 6px 10px 10px;
 }
+
+/* 导出提示 */
+.fb-fs-toast {
+  position: fixed;
+  left: 50%;
+  bottom: 48px;
+  transform: translateX(-50%) translateY(12px);
+  background: rgba(20, 24, 32, 0.92);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: #f4f6fb;
+  font-size: 13px;
+  font-weight: 700;
+  padding: 9px 18px;
+  border-radius: 999px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .2s ease, transform .2s ease;
+  z-index: 10001;
+}
+.fb-fs-toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 
 /* 移动端：工具栏紧凑、可横向滚动 */
 @media (max-width: 760px) {

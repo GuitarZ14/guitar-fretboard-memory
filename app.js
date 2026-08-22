@@ -560,9 +560,11 @@ function getPracticeNotes() {
   const { min, max } = state.practice.fretRange;
   const strings = state.practice.strings;
 
-  // 只保留在「选中弦组 + 当前品格区间」内至少有一个位置的音名
+  // 只保留在「选中弦组 + 当前品格区间」内、可在【每一根】选中弦上都找到位置的音名。
+  // 这样每道题的 targetStrings 就等于完整的选中弦组，提示词的「需找 N 根弦」与
+  // 实际勾选的弦数一致，且必须点齐所有选中弦才会进入下一题。
   return base.filter((note) =>
-    strings.some((stringIndex) => {
+    strings.every((stringIndex) => {
       const pitch = STRINGS[stringIndex - 1].pitch;
       for (let fret = min; fret <= max; fret += 1) {
         if (CHROMATIC[(pitch + fret) % 12] === note.pitch) return true;
@@ -791,9 +793,14 @@ function closeSummary() {
 function startPracticeRound() {
   state.practice.accidentals = elements.accidentalsToggle.checked;
   const notes = getPracticeNotes();
-  // 弦组为空（默认全灰、用户尚未勾选）：提示先选择弦组，不进入出题，避免空集直接结算
+  // 弦组为空（默认全灰、用户尚未勾选，或所选弦在品格区间内没有共同音名）：
+  // 提示先选择弦组，不进入出题，避免空集直接结算
   if (notes.length === 0) {
-    setAnswerStatus("请在「选择弦组」中至少勾选一根弦，再开始练习。");
+    if (!Array.isArray(state.practice.strings) || state.practice.strings.length === 0) {
+      setAnswerStatus("请在「选择弦组」中至少勾选一根弦，再开始练习。");
+    } else {
+      setAnswerStatus("所选弦组在「品格区间」内没有共同的音名，请扩大品格区间或重新勾选弦组。");
+    }
     state.practice.started = false;
     state.practice.roundTotal = 0;
     state.noteQueue = [];
