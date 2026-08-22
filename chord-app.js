@@ -394,7 +394,6 @@ const elements = {
   fretboardArea: document.querySelector("#fretboardArea"),
   voicingHint: document.querySelector("#voicingHint"),
   voicingHintText: document.querySelector("#voicingHintText"),
-  diagramHint: document.querySelector("#diagramHint"),
   theoryDesc: document.querySelector("#theoryDesc"),
   handSwitch: document.querySelector("#handSwitch"),
   accidentalSwitch: document.querySelector("#accidentalSwitch"),
@@ -802,10 +801,6 @@ function renderHero() {
   elements.theoryDesc.textContent = type.desc;
 }
 
-function voicingTag(v, index, group) {
-  return `变体 ${index + 1}`;
-}
-
 function renderVoicings() {
   const type = currentType();
   const tuning = TUNINGS[state.tuningId];
@@ -827,8 +822,6 @@ function renderVoicings() {
   if (state.view === "voicing") {
     elements.fretboardArea.hidden = true;
     elements.voicingArea.hidden = false;
-    const legend = document.querySelector(".legend");
-    if (legend) legend.hidden = false;
 
     const groups = extendedVoicings(state.typeId, state.root, tuning.pitches);
     const total = groups.must.length + groups.open.length + groups.moveable.length;
@@ -841,22 +834,19 @@ function renderVoicings() {
         </div>`;
       elements.voicingHint.classList.remove("visible");
       elements.voicingHintText.textContent = "未找到";
-      elements.diagramHint.textContent = "";
       return;
     }
 
-    const sectionHTML = (label, items, group) =>
+    const sectionHTML = (label, items) =>
       items.length === 0 ? "" : `
         <div class="voicing-section">
           <h3 class="voicing-section-title">${label}<span class="voicing-section-count">${items.length}</span></h3>
           <div class="voicing-grid">
             ${items
               .map(
-                (v, i) => `
+                (v) => `
               <figure class="voicing-card">
-                <span class="voicing-tag">${voicingTag(v, i, group)}</span>
                 <div class="chord-diagram">${buildVoicingSVG(v, type, tuning)}</div>
-                <figcaption class="voicing-meta">${voicingMeta(v, tuning)}</figcaption>
               </figure>`
               )
               .join("")}
@@ -869,7 +859,6 @@ function renderVoicings() {
       ? (() => {
           const isScale = entrySource === "scale";
           const tagText = isScale ? "音阶练习页推荐" : "探索模式推荐";
-          const tagForCard = isScale ? "从音阶练习页跳入" : "从探索模式跳入";
           const metaText = isScale
             ? `所属音阶级数 · 已选 ${detailVoicing.pickedSet.length} 音 · 此和弦为所选音阶的顺阶和弦，按法与组成音位置已高亮。`
             : `已选 ${detailVoicing.pickedSet.length} 音 · 您点选的下述指法，与您已选音对应位置一致。`;
@@ -884,9 +873,7 @@ function renderVoicings() {
             <button type="button" class="picker-back-btn" id="pickerBackBtn">${backText}</button>
           </div>
           <figure class="voicing-card detail-card">
-            <span class="voicing-tag detail-card-tag">${tagForCard}</span>
             <div class="chord-diagram detail-diagram">${buildVoicingSVG(detailVoicing.voicing, type, tuning, { highlightSet: detailPickMap })}</div>
-            <figcaption class="voicing-meta">${voicingMeta(detailVoicing.voicing, tuning)}</figcaption>
           </figure>
         </div>`;
         })()
@@ -894,9 +881,9 @@ function renderVoicings() {
 
     elements.voicingArea.innerHTML =
       detailHTML +
-      sectionHTML("MUST KNOW 必学", groups.must, "must") +
-      sectionHTML("OPEN CHORDS 开放和弦", groups.open, "open") +
-      sectionHTML("MOVEABLE 可移位", groups.moveable, "moveable");
+      sectionHTML("MUST KNOW 必学", groups.must) +
+      sectionHTML("OPEN CHORDS 开放和弦", groups.open) +
+      sectionHTML("MOVEABLE 可移位", groups.moveable);
 
     // 绑定返回按钮（重新渲染后元素是新节点，需重新绑定）
     const backBtn = document.getElementById("pickerBackBtn");
@@ -904,14 +891,10 @@ function renderVoicings() {
 
     elements.voicingHint.classList.add("visible");
     elements.voicingHintText.textContent = `${total} 个指法`;
-    elements.diagramHint.innerHTML =
-      `<span class="hint-line"></span> 弦序：${orderString(tuning)} · 数字为品位；切换调音 / 左右手，会同步刷新指法与全指板。`;
   } else {
     // 探索模式：指板清空 + 用户点击选音 → 上方显示组成音与匹配和弦（含转位）
     elements.voicingArea.hidden = true;
     elements.fretboardArea.hidden = false;
-    const legend = document.querySelector(".legend");
-    if (legend) legend.hidden = true;
     // 清空详情首卡，避免从详情视图返回后节点残留
     if (elements.voicingArea.querySelector(".picker-detail-block")) {
       elements.voicingArea.querySelectorAll(".picker-detail-block").forEach((n) => n.remove());
@@ -925,7 +908,7 @@ function renderVoicings() {
 
     const matches = findMatchingChords(pickedNotes);
     const matchCards = matches.length === 0
-      ? `<div class="theory-desc picker-empty">点击下方指板选音，将自动列出包含这些音的所有和弦（含转位）。</div>`
+      ? "" // 无匹配时留空，不输出说明性文字
       : matches.map((m) => {
           const v = pickMatchingVoicing(m.root, m.typeId, pickedNotes, tuning, pickedPositions);
           if (!v) return "";
@@ -947,8 +930,6 @@ function renderVoicings() {
               <span class="chord-card-symbol">${symbol}</span>
               <div class="chord-diagram">${buildVoicingSVG(v, m.type, tuning)}</div>
               <div class="chord-card-notes">${noteLabels.map((n) => `<span class="chip tone-chip chord-note-chip"><span class="chord-note-name">${n.name}</span><sub class="chord-note-deg">${n.degree}</sub></span>`).join("")}</div>
-              <figcaption class="voicing-meta">${voicingMeta(v, tuning)}</figcaption>
-              <span class="picker-jump-hint" aria-hidden="true">查看详情 →</span>
             </figure>`;
         }).join("");
 
@@ -959,12 +940,10 @@ function renderVoicings() {
           <div class="tone-chips picker-tone-chips" aria-label="已选组成音">${noteChips || '<span class="picker-empty-text">未选</span>'}</div>
           <button type="button" class="picker-clear-btn" id="pickerClearBtn" ${pickedPcs.length === 0 ? "disabled" : ""}>清空</button>
         </div>
-        <p class="picker-hint">点击下方指板任意位置可加/取消选音，再次点击同一位置取消。</p>
       </div>
       <div class="fretboard-scroll" id="fretboardScroll">
         <div class="fretboard-part" id="fretboardPartLow">${buildFullFretboardSVG(type, tuning, { start: 0, end: 24, leftPad: 40, showNames: true, pickedPositions })}</div>
       </div>
-      <p class="fretboard-scroll-hint">← 横向滑动浏览全部 24 品 →</p>
       <div class="picker-matches">
         <h3 class="picker-matches-title">匹配和弦 <span class="picker-matches-count">${matches.length}</span></h3>
         <div class="voicing-grid picker-grid">${matchCards}</div>
@@ -975,8 +954,6 @@ function renderVoicings() {
 
     elements.voicingHint.classList.add("visible");
     elements.voicingHintText.textContent = `已选 ${pickedPcs.length} 音 · 匹配 ${matches.length} 个和弦`;
-    elements.diagramHint.innerHTML =
-      `<span class="hint-line"></span> 探索模式：点击指板切换选音；匹配和弦含转位（低音标在 <code>/X</code> 后，组成音后为音级）。`;
   }
 }
 
@@ -993,22 +970,6 @@ function loadHighFretboardPicker() {
   scroll.insertBefore(part, more || null);
   if (more) more.remove();
   scroll.style.maxWidth = "none";
-}
-
-function orderString(tuning) {
-  const names = tuning.pitches.map((p) => noteName(p, state.accidental));
-  if (state.handed === "left") names.reverse();
-  return names.join("–");
-}
-
-function voicingMeta(v, tuning) {
-  const rootStr = v.rootStrings.slice().sort((a, b) => a - b)[0];
-  const stringName = noteName(tuning.pitches[rootStr], state.accidental);
-  const fret = v.frets[rootStr];
-  const rootFretTxt = fret === 0 ? "空弦" : `${fret} 品`;
-  const played = v.frets.filter((f) => f >= 0).length;
-  const open = v.frets.filter((f) => f === 0).length;
-  return `根音 ${stringName}弦${rootFretTxt}${open ? ` · ${open} 空弦` : ""}`;
 }
 
 /* ---------------- 探索模式：匹配和弦（含转位） ---------------- */

@@ -911,7 +911,8 @@ if (typeof document !== "undefined") {
           accidental: state.accidental,
         });
       } else {
-        diagram.innerHTML = '<span class="voicing-meta">无指法</span>';
+        // 无指法时留空占位，不输出说明性文字
+        diagram.innerHTML = "";
       }
 
       // 「查看详情」按钮：跳转至 chords.html，复刻探索模式跳转逻辑

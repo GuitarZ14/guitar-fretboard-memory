@@ -150,9 +150,8 @@ async function main() {
     disabled: document.getElementById('pickerClearBtn').disabled,
     chips: [...document.querySelectorAll('.picker-tone-chips .chip')].length,
     cards: document.querySelectorAll('.picker-card').length,
-    empty: !!document.querySelector('.picker-empty'),
   }))()`);
-  results.push(`清空后: disabled=${afterClear.disabled}, chips=${afterClear.chips}, cards=${afterClear.cards}, empty=${afterClear.empty} (期望 disabled=true chips=0 cards=0 empty=true)`);
+  results.push(`清空后: disabled=${afterClear.disabled}, chips=${afterClear.chips}, cards=${afterClear.cards} (期望 disabled=true chips=0 cards=0)`);
 
   // 重复点击同一位置应取消（toggle）
   await clickFret(2, 0);
@@ -164,7 +163,7 @@ async function main() {
     && picked.cards.includes("Dm")
     && picked.cards.includes("F6")
     && picked.cards.includes("Asus4#5")
-    && afterClear.disabled === true && afterClear.chips === 0 && afterClear.cards === 0 && afterClear.empty
+    && afterClear.disabled === true && afterClear.chips === 0 && afterClear.cards === 0
     && toggle === 0;
 
   console.log("\n=== chords.html picker 真实浏览器验证 ===");

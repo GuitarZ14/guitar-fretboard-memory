@@ -163,7 +163,6 @@ async function main() {
       hasBackBtn: !!document.getElementById('pickerBackBtn'),
       hasPickRing: ringSet.length,
       pickRingCxs: [...ringSet].map(c => c.getAttribute('cx')).join(','),
-      detailTagText: (document.querySelector('.detail-card-tag') || {}).textContent || '',
       detailBananaText: (document.querySelector('.picker-detail-meta') || {}).textContent || '',
       viewModeNow: document.querySelector('#viewSwitch button.active')?.dataset.view || '',
       detailSvg: document.querySelector('.detail-diagram svg')?.outerHTML.slice(0, 3000) || '',
@@ -202,7 +201,6 @@ async function main() {
     && detailState.hasDetailCard
     && detailState.hasBackBtn
     && detailState.hasPickRing >= 1 // 高亮至少一个已选位置
-    && detailState.detailTagText.includes("探索")
     && detailState.detailBananaText.includes("已选")
     && detailState.viewModeNow === "voicing"
     && afterBack.viewMode === "fretboard"
@@ -220,7 +218,6 @@ async function main() {
   if (!detailState.hasDetailCard) errors.push("未渲染 detail-card");
   if (!detailState.hasBackBtn) errors.push("未渲染返回按钮");
   if (detailState.hasPickRing < 1) errors.push(`pickRing 数量 ${detailState.hasPickRing} < 1`);
-  if (!detailState.detailTagText.includes("探索")) errors.push(`detail 标签文案错误: ${detailState.detailTagText}`);
   if (!detailState.detailBananaText.includes("已选")) errors.push(`banner meta 文案错误: ${detailState.detailBananaText}`);
   if (detailState.viewModeNow !== "voicing") errors.push(`视图未切到 voicing: ${detailState.viewModeNow}`);
   if (afterBack.viewMode !== "fretboard") errors.push(`返回后视图不是 fretboard: ${afterBack.viewMode}`);

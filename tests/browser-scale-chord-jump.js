@@ -140,7 +140,6 @@ async function main() {
     heroSymbol: document.querySelector('.hero-card #chordSymbol').textContent.trim(),
     heroVisible: !document.querySelector('.hero-card').hidden,
     hasDetailCard: !!document.querySelector('.detail-card'),
-    detailTag: (document.querySelector('.detail-card-tag') || {}).textContent || '',
     bannerTag: (document.querySelector('.picker-detail-tag') || {}).textContent || '',
     bannerMeta: (document.querySelector('.picker-detail-meta') || {}).textContent || '',
     backBtnText: (document.querySelector('#pickerBackBtn') || {}).textContent || '',
@@ -177,7 +176,6 @@ async function main() {
   if (!detailState.heroVisible) errors.push("Hero 卡片应可见");
   if (detailState.heroSymbol !== "Fmaj7") errors.push(`Hero 符号应为 Fmaj7，实际 ${detailState.heroSymbol}`);
   if (!detailState.hasDetailCard) errors.push("未渲染 detail-card");
-  if (!detailState.detailTag.includes("音阶")) errors.push(`detail 卡片标签错误: ${detailState.detailTag}`);
   if (!detailState.bannerTag.includes("音阶")) errors.push(`banner 标签错误: ${detailState.bannerTag}`);
   if (!detailState.bannerMeta.includes("音阶")) errors.push(`banner meta 错误: ${detailState.bannerMeta}`);
   if (!detailState.backBtnText.includes("音阶练习")) errors.push(`返回按钮文案错误: ${detailState.backBtnText}`);

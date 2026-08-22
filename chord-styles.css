@@ -779,9 +779,9 @@ button { color: inherit; cursor: pointer; }
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 4px;
+  justify-content: center;
   margin: 0;
-  padding: 8px 6px 7px;
+  padding: 10px 8px;
   width: 100%;
   min-width: 0;
   background: var(--surface);
@@ -791,43 +791,27 @@ button { color: inherit; cursor: pointer; }
   transition: translate .25s ease, box-shadow .25s ease;
 }
 .voicing-card:hover { translate: 0 -4px; box-shadow: var(--shadow-clay); }
-.voicing-tag {
-  font-size: 8px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--text-3);
-  padding: 2px 8px;
-  background: var(--surface);
-  border: var(--clay-border-sm);
-  border-radius: var(--radius-pill);
-}
 .chord-diagram {
   margin: 0;
   width: 100%;
   max-width: 100%;
   line-height: 0;
+  display: flex;
+  justify-content: center;
 }
 .chord-diagram svg {
   width: 100%;
   height: auto;
-  max-width: 110px;
-}
-.voicing-meta {
-  font-size: 9px;
-  font-weight: 600;
-  color: var(--text-3);
-  line-height: 1.35;
-  text-align: center;
+  max-width: 150px; /* 放大：原 110px，删除说明文字后让指法图更大 */
 }
 
-/* SVG 内文本 */
-.diagram-fretnum { font-family: var(--font); font-size: 9px; font-weight: 700; fill: var(--text-3); }
-.diagram-stringname { font-family: var(--font); font-size: 8px; font-weight: 800; fill: var(--text-3); }
-.diagram-root { font-family: var(--font); font-size: 9px; font-weight: 800; fill: #ffffff; }
-.diagram-finger { font-family: var(--font); font-size: 8px; font-weight: 800; fill: var(--tone-ink); }
-.diagram-open { font-family: var(--font); font-size: 10px; font-weight: 800; fill: var(--text-2); }
-.diagram-mute { font-family: var(--font); font-size: 10px; font-weight: 800; fill: var(--text-3); }
+/* SVG 内文本（放大后字号同步上调，保持清晰） */
+.diagram-fretnum { font-family: var(--font); font-size: 11px; font-weight: 700; fill: var(--text-3); }
+.diagram-stringname { font-family: var(--font); font-size: 10px; font-weight: 800; fill: var(--text-3); }
+.diagram-root { font-family: var(--font); font-size: 11px; font-weight: 800; fill: #ffffff; }
+.diagram-finger { font-family: var(--font); font-size: 10px; font-weight: 800; fill: var(--tone-ink); }
+.diagram-open { font-family: var(--font); font-size: 12px; font-weight: 800; fill: var(--text-2); }
+.diagram-mute { font-family: var(--font); font-size: 12px; font-weight: 800; fill: var(--text-3); }
 
 /* 全指板图（横向滚动 + 分段动态加载） */
 .fretboard-scroll {
@@ -860,14 +844,6 @@ button { color: inherit; cursor: pointer; }
 }
 .fretboard-more-arrow { font-size: 13px; }
 .fretboard-more-text { letter-spacing: 0.5px; }
-.fretboard-scroll-hint {
-  margin: 2px 0 6px;
-  text-align: center;
-  color: var(--text-3);
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.5px;
-}
 .fretboard-scroll::-webkit-scrollbar { height: 10px; }
 .fretboard-scroll::-webkit-scrollbar-thumb { background: rgba(120, 120, 140, 0.4); border-radius: var(--radius-pill); }
 .full-fretboard svg { display: block; }
@@ -892,39 +868,6 @@ button { color: inherit; cursor: pointer; }
   0% { r: 8; opacity: 1; stroke-width: 3; }
   100% { r: 28; opacity: 0; stroke-width: 0; }
 }
-
-/* 图例 */
-.legend {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  margin-top: 12px;
-  font-size: 10px;
-  font-weight: 600;
-  color: var(--text-3);
-}
-.legend-root {
-  display: inline-block;
-  padding: 2px 9px;
-  color: #fff;
-  background: var(--root-fill);
-  border-radius: var(--radius-pill);
-  font-weight: 800;
-  box-shadow: 2px 2px 0 rgba(79, 143, 176, 0.4);
-}
-
-.fretboard-hint {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin: 8px 0 0;
-  font-size: 10px;
-  font-weight: 500;
-  color: var(--text-3);
-}
-.hint-line { width: 18px; height: 3px; border-radius: var(--radius-pill); background: var(--surface-blue); }
 
 /* ===================== 和弦描述（hero 内 + 空状态复用） ===================== */
 .theory-desc {
@@ -1075,8 +1018,7 @@ footer > span { margin-right: 2px; }
   .layout-right .type-btn { flex: 0 0 auto; }
 
   .voicing-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 9px; }
-  .chord-diagram svg { max-width: 110px; }
-  .voicing-tag { margin-right: 2px; }
+  .chord-diagram svg { max-width: 100%; }
 
   footer { margin-top: 12px; padding: 9px 0; font-size: 8px; }
 }
@@ -1171,7 +1113,6 @@ footer > span { margin-right: 2px; }
 }
 .picker-clear-btn:hover:not(:disabled) { transform: translateY(-1px); color: var(--green); }
 .picker-clear-btn:disabled { opacity: 0.45; cursor: not-allowed; }
-.picker-hint { margin: 0; font-size: 11px; color: var(--text-3); }
 
 .picker-fretboard { cursor: crosshair; }
 
@@ -1239,7 +1180,6 @@ footer > span { margin-right: 2px; }
   top: -3px;
   margin-left: 1px;
 }
-.picker-empty { width: 100%; margin: 0 !important; }
 
 /* ===== 探索模式：匹配和弦卡片可点击跳转 ===== */
 .picker-jump-card {
@@ -1257,19 +1197,6 @@ footer > span { margin-right: 2px; }
 }
 .picker-jump-card:focus-visible { box-shadow: 0 0 0 3px rgba(245,166,156,0.4); }
 .picker-jump-card:active { translate: 0 -1px; }
-.picker-jump-hint {
-  position: absolute;
-  bottom: 4px;
-  right: 6px;
-  font-size: 9px;
-  font-weight: 700;
-  color: #b96e64;
-  opacity: 0;
-  transition: opacity .2s ease;
-  pointer-events: none;
-}
-.picker-jump-card:hover .picker-jump-hint,
-.picker-jump-card:focus-visible .picker-jump-hint { opacity: 1; }
 
 /* ===== 详情模式：从探索跳入时的高亮首卡 ===== */
 .picker-detail-block {
@@ -1335,21 +1262,16 @@ footer > span { margin-right: 2px; }
 }
 .picker-back-btn:active { translate: 0 0; }
 
-/* 详情首卡：放大展示 + 顶端打标 */
+/* 详情首卡：放大展示 */
 .detail-card {
   border: 1px solid rgba(245, 166, 156, 0.55);
   background: #fff;
 }
-.detail-card-tag {
-  background: #fff5f1;
-  color: #b96e64;
-  border-color: rgba(245,166,156,0.5);
-}
 .detail-diagram { padding: 6px 0 4px; }
-.detail-diagram svg { max-width: 160px; }
+.detail-diagram svg { max-width: 240px; } /* 放大：原 160px，详情首卡占更大空间 */
 
 @media (max-width: 640px) {
-  .picker-jump-hint { opacity: 1; font-size: 8px; }
   .picker-detail-banner { gap: 8px; }
   .picker-back-btn { padding: 6px 12px; font-size: 11px; }
+  .detail-diagram svg { max-width: 200px; }
 }
