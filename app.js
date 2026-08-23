@@ -239,9 +239,9 @@ const STRINGS = [
 ];
 // 弦序号 1-6（索引 0 = 一弦高音E … 索引 5 = 六弦低音E）
 const ALL_STRINGS = STRINGS.map((_, index) => index + 1);
-// 进入「点按模式」默认单选一弦：低音 E 弦（6 弦，最基础、0-12 品音位清晰），
-// 确保进入模式即可直接点按，无需用户手动选弦；用户可在模式内切换/多选。
-const DEFAULT_STRING = 6;
+// 进入「点按模式」默认选择全部弦，确保任意默认品格区间下都能生成≥2个可点击位置，
+// 避免用户一进入模式就因「当前选择无解」被弹窗阻断；用户仍可在模式内自由切换/多选。
+const DEFAULT_STRINGS = [...ALL_STRINGS];
 
 // 练习难度现在由用户通过双滑块自由设定品格区间 [minFret, maxFret]
 function loadFretRange() {
@@ -272,8 +272,8 @@ function saveFretRange(range) {
 }
 
 // 练习难度：用户可单独或组合勾选琴弦（1-6）。
-// 进入点按模式默认「单选一弦」——初始仅点亮默认弦（DEFAULT_STRING），用户可直接点按；
-// 之后可在模式内点弦按钮切换为其他弦或追加多选，选择会持久化。
+// 进入点按模式默认「全部弦」——保证默认品格区间下即可生成有效题目，
+// 避免用户一进入模式就因「当前选择无解」被弹窗阻断；用户仍可在模式内自由切换/多选，选择会持久化。
 function loadStrings() {
   try {
     const saved = JSON.parse(localStorage.getItem(STRING_STORAGE_KEY));
@@ -286,7 +286,7 @@ function loadStrings() {
   } catch {
     // fall back to default
   }
-  return [DEFAULT_STRING];
+  return [...DEFAULT_STRINGS];
 }
 
 function saveStrings(strings) {
@@ -601,6 +601,29 @@ function getPracticeNotes() {
   });
 }
 
+/* 判断当前「选中弦组 + 品格区间 + 升降号设置」是否能生成有效题目池。 */
+function hasSolvableConfig() {
+  return getPracticeNotes().length > 0;
+}
+
+/* 自动调整配置以生成有效题目池：先尝试全部弦，再尝试完整品格范围。
+   返回是否成功；全部弦 + 0-24 品在常规设置下一定有解。 */
+function ensureSolvableConfig() {
+  if (hasSolvableConfig()) return true;
+
+  // 第一步：扩展为全部弦
+  state.practice.strings = [...ALL_STRINGS];
+  saveStrings(state.practice.strings);
+  renderStringButtons();
+  if (hasSolvableConfig()) return true;
+
+  // 第二步：仍然无解时，扩展为完整品格范围
+  state.practice.fretRange = { min: MIN_FRET, max: MAX_FRET };
+  saveFretRange(state.practice.fretRange);
+  renderFretRangeInputs();
+  return hasSolvableConfig();
+}
+
 function getBestKey() {
   const { min, max } = state.practice.fretRange;
   const acc = state.practice.accidentals ? 1 : 0;
@@ -870,6 +893,8 @@ function startPracticeRound() {
 
 function ensurePracticeRound() {
   if (!state.practice.started || state.noteQueue.length === 0) {
+    // 在初始化本轮前先尝试自动调整到有解配置，避免模式切换/页面初始化时直接弹窗
+    if (!hasSolvableConfig()) ensureSolvableConfig();
     startPracticeRound();
     return;
   }
@@ -953,11 +978,20 @@ function setMode(mode) {
   if (state.summaryOpen) closeSummary();
 
   if (mode === "practice") {
-    // 进入点按模式：若当前无有效弦选择（用户曾在模式内清空），回退到默认单选一弦，确保进入即可点按
+    // 进入点按模式：若当前无有效弦选择（用户曾在模式内清空），回退到默认全部弦，
+    // 保证默认区间下即可生成有效题目，避免一进入模式就弹窗阻断。
     if (!Array.isArray(state.practice.strings) || state.practice.strings.length === 0) {
-      state.practice.strings = [DEFAULT_STRING];
+      state.practice.strings = [...DEFAULT_STRINGS];
+    }
+    // 若当前弦组+品格区间仍无解，自动扩展为全部弦/完整品格范围，
+    // 确保用户进入模式后能直接开始做题，而不是被 alert 弹窗打断。
+    if (!hasSolvableConfig()) {
+      if (ensureSolvableConfig()) {
+        setAnswerStatus("已自动调整弦组/品格范围，确保有题可练");
+      }
     }
     renderStringButtons();
+    renderFretRangeInputs();
     ensurePracticeRound();
   } else {
     clearTimeout(state.practice.advanceTimer);
