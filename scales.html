@@ -138,7 +138,6 @@
                     <button type="button" data-label="degree" aria-pressed="false">级数</button>
                   </div>
                 </div>
-                <button class="fb-fullscreen-btn" id="fbFullscreenBtn" type="button" aria-label="指板全屏放大与标注">⤢ 全屏标注</button>
               </div>
             </div>
 
@@ -203,19 +202,7 @@
     </main>
 
     <script src="chord-engine.js?v=3"></script>
-    <script src="scale-app.js?v=7"></script>
-    <script src="fretboard-annotate.js?v=1"></script>
-    <script>
-      // 指板全屏放大 + 自由标注
-      (function () {
-        var btn = document.getElementById('fbFullscreenBtn');
-        if (!btn) return;
-        btn.addEventListener('click', function () {
-          var svg = document.querySelector('#scaleFretboard svg');
-          if (window.FretboardAnnotate) window.FretboardAnnotate.open(svg, '音阶在指板上的分布');
-        });
-      })();
-    </script>
+    <script src="scale-app.js?v=8"></script>
     <script>
       // 滚动触发入场动画：进入视口时添加 .in-view（播放一次）
       (function () {
