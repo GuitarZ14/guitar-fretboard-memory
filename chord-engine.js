@@ -386,7 +386,7 @@ function scoreVoicing(v) {
  * 验证：transposition 后所有发声音必须在和弦音名集合内；否则该 shape 对该根音无效。
  */
 const SHAPES = [
-{ types: ["major"], base: 0, frets: [-1, 3, 2, 0, 1, 0], label: "开放 A 型" },
+  { types: ["major"], base: 0, frets: [-1, 3, 2, 0, 1, 0], label: "开放 A 型" },
   { types: ["major"], base: 0, frets: [8, 10, 10, 9, 8, 8], label: "E 型 1 品（6 弦根）" },
   { types: ["minor"], base: 0, frets: [-1, 3, 5, 5, 4, 3], label: "A 型 3 品" },
   { types: ["minor"], base: 0, frets: [3, 3, 5, 5, 4, 3], label: "A 型 3 品（6 弦根）" },
@@ -439,68 +439,72 @@ function transposedShapes(typeId, targetRoot, tuningPitches, opts = {}) {
   for (const sh of SHAPES) {
     if (!sh.types.includes(typeId)) continue;
     const trans = targetRoot - sh.base;
-    // transposition：空弦不变（capo 升时其实变了，但空弦音名仍由 tuningPitches 提供，这里 trans 仅影响按弦）
-    // 注意：原指法的"空弦音名"是按 base 根音时算的（如 C major x32010 的 3 弦 0 品 = G = 5 半音，是 C 和弦音）
-    // transposition 后：3 弦 0 品音名仍 = G（实际音不变），但目标根音下 G 是 C 和弦音 ✓
-    // 所以 transposition 不影响空弦音名（仅按弦）。✓
-    const newFrets = sh.frets.map((f) => {
-      if (f < 0) return -1; // 闷
-      if (f === 0) return 0; // 空弦
-      return f + trans; // 按弦 + trans
-    });
+    // 同一个形状尝试 trans 与 trans-12 两个八度，取把位更低（baseFret 更小）的合法候选。
+    // 这样 CAGED 各形状对每一个根音都能落在尽量低的品位，而不是被推到高把位。
+    let best = null;
+    for (const off of [trans, trans - 12]) {
+      const newFrets = sh.frets.map((f) => {
+        if (f < 0) return -1; // 闷
+        if (f === 0) return 0; // 空弦
+        return f + off; // 按弦 + off
+      });
 
-    // 验证
-    const covered = new Set();
-    let playedCount = 0;
-    let baseFret = Infinity;
-    const fs = [];
-    for (let si = 0; si < 6; si += 1) {
-      const f = newFrets[si];
-      if (f < 0) continue;
-      playedCount += 1;
-      const semi = mod12(pitches[si] + f);
-      covered.add(semi);
-      if (f > 0) {
-        fs.push(f);
-        if (f < baseFret) baseFret = f;
-      } else {
-        // 空弦：baseFret=0 表示开放
-        if (baseFret > 0) baseFret = 0;
+      // 验证
+      const covered = new Set();
+      let playedCount = 0;
+      let baseFret = Infinity;
+      const fs = [];
+      for (let si = 0; si < 6; si += 1) {
+        const f = newFrets[si];
+        if (f < 0) continue;
+        playedCount += 1;
+        const semi = mod12(pitches[si] + f);
+        covered.add(semi);
+        if (f > 0) {
+          fs.push(f);
+          if (f < baseFret) baseFret = f;
+        } else {
+          // 空弦：baseFret=0 表示开放
+          if (baseFret > 0) baseFret = 0;
+        }
       }
-    }
-    if (playedCount < 3) continue;
-    if (baseFret === Infinity) baseFret = 0;
+      if (playedCount < 3) continue;
+      if (baseFret === Infinity) baseFret = 0;
 
-    // 必须在 0..15
-    if (fs.length && (fs.some((f) => f < 0 || f > 15))) continue;
-    // 必须覆盖 required（核心音）
-    if (!required.every((r) => covered.has(r))) continue;
-    // 跨度过大
-    let span = 0;
-    if (fs.length) {
-      span = Math.max(...fs) - Math.min(...fs);
-      if (span > 4) continue;
-    }
-
-    // 根音弦
-    const rootStrings = [];
-    for (let si = 0; si < 6; si += 1) {
-      if (newFrets[si] >= 0 && mod12(pitches[si] + newFrets[si]) === targetRoot) {
-        rootStrings.push(si);
+      // 必须在 0..15
+      if (fs.length && (fs.some((f) => f < 0 || f > 15))) continue;
+      // 必须覆盖 required（核心音）
+      if (!required.every((r) => covered.has(r))) continue;
+      // 跨度过大
+      let span = 0;
+      if (fs.length) {
+        span = Math.max(...fs) - Math.min(...fs);
+        if (span > 4) continue;
       }
-    }
-    if (rootStrings.length === 0) continue;
 
-    out.push({
-      frets: newFrets,
-      baseFret,
-      span,
-      rootStrings,
-      fingers: assignFingers(newFrets),
-      group: classifyVoicing({ frets: newFrets, baseFret }, true),
-      label: sh.label,
-      source: "shape",
-    });
+      // 根音弦
+      const rootStrings = [];
+      for (let si = 0; si < 6; si += 1) {
+        if (newFrets[si] >= 0 && mod12(pitches[si] + newFrets[si]) === targetRoot) {
+          rootStrings.push(si);
+        }
+      }
+      if (rootStrings.length === 0) continue;
+
+      const cand = {
+        frets: newFrets,
+        baseFret,
+        span,
+        rootStrings,
+        fingers: assignFingers(newFrets),
+        group: classifyVoicing({ frets: newFrets, baseFret }, true),
+        label: sh.label,
+        cageShape: sh.cageShape || null,
+        source: "shape",
+      };
+      if (!best || cand.baseFret < best.baseFret) best = cand;
+    }
+    if (best) out.push(best);
   }
   // 去重
   const seen = new Set();
@@ -527,6 +531,123 @@ function requiredIntervals(type) {
   }
   essential.push(intervals[intervals.length - 1]);
   return [...new Set(essential)];
+}
+
+/* ---------- CAGED 五型生成器 ----------
+ * 用「度数模板」描述每个 CAGED 形状：数组为 6 根弦（6→1），
+ * 数值 = 该弦相对根音的半音度数（0=根音,4=大三,3=小三,7=纯五,10=b7,11=大七），null = 该弦不发声。
+ * 根音所在的弦即「形状的根弦」。给定目标根音与调弦后，自动在最低把位求出每根弦的实际品位，
+ * 保证：所有发声音都是和弦音、跨度 ≤4 品、可使用空弦（即含开放形态）。不依赖手工写死的把位数。
+ */
+const CAGED_TEMPLATES = {
+  // 大三和弦：C/A/G/E/D 五型
+  major: {
+    C: [null, 0, 4, 7, 0, 7],
+    A: [null, 0, 7, 0, 4, 7],
+    G: [7, null, 7, 0, 4, 7],
+    E: [0, 7, 0, 4, 7, 0],
+    D: [null, null, 0, 7, 0, 4],
+  },
+  // 小三和弦：三音 4 → 3
+  minor: {
+    C: [null, 0, 3, 7, 0, 7],
+    A: [null, 0, 7, 0, 3, 7],
+    G: [7, null, 7, 0, 3, 7],
+    E: [0, 7, 0, 3, 7, 0],
+    D: [null, null, 0, 7, 0, 3],
+  },
+  // 属七：在大小三和弦基础上加入 b7(10)，仅给最实用的 E 型 / A 型横按
+  "7": {
+    E: [0, 7, 10, 4, 7, 0],
+    A: [null, 0, 7, 10, 4, 7],
+  },
+  // 大七：加入大七(11)
+  maj7: {
+    E: [0, 7, 11, 4, 7, 0],
+    A: [null, 0, 7, 11, 4, 7],
+  },
+  // 小七：加入 b7(10)，三音为小三(3)
+  m7: {
+    E: [0, 7, 10, 3, 7, 0],
+    A: [null, 0, 7, 10, 3, 7],
+  },
+};
+
+function generateCaged(typeId, root, tuningPitches) {
+  const tpls = CAGED_TEMPLATES[typeId];
+  if (!tpls) return [];
+  const out = [];
+  for (const shape of Object.keys(tpls)) {
+    const tpl = tpls[shape];
+    const rootStr = tpl.indexOf(0); // 根音所在弦（0-based，6→1 对应 0→5）
+    if (rootStr < 0) continue;
+
+    let best = null;
+    // 遍历根弦可能按的品位（0=空弦 ~ 15）
+    for (let r = 0; r <= 15; r += 1) {
+      const frets = tpl.map((deg, si) => {
+        if (deg === null) return -1; // 不发声
+        if (si === rootStr) return r; // 根弦就按在 r
+        // 其它弦：需要发出的音 = root + deg；在该弦上取「与 r 同把位、最接近 r」的品位（±6 品内）
+        const need = mod12(root + deg);
+        const open = mod12(tuningPitches[si]);
+        let off = mod12(need - (open + r)); // 相对 r 的偏移（0..11）
+        // 取最接近 r 的等价偏移（落在 -6..+6），保证把位紧凑、跨度小
+        if (off > 6) off -= 12;
+        let f = r + off;
+        // 若越界，尝试另一个八度
+        if (f > 15) f -= 12;
+        if (f < 0) f += 12;
+        return f;
+      });
+      // 校验：所有发声弦必须在 0..15，且跨度 ≤4
+      const pressed = frets.filter((f) => f > 0);
+      const allOk = frets.every((f) => f === -1 || (f >= 0 && f <= 15));
+      if (!allOk) continue;
+      const minF = Math.min(...frets.filter((f) => f >= 0));
+      const maxF = Math.max(...frets.filter((f) => f >= 0));
+      const span = maxF - minF;
+      if (span > 4) continue;
+      // 校验每个发声音确实是和弦音（度数模板本身保证，这里再兜底）
+      const type = CHORD_TYPE_MAP[typeId];
+      const set = new Set(type.intervals.map((i) => mod12(root + i)));
+      const notesOk = frets.every((f, si) => {
+        if (f < 0) return true;
+        return set.has(mod12(tuningPitches[si] + f));
+      });
+      if (!notesOk) continue;
+
+      const baseFret = pressed.length ? minF : 0;
+      const rootStrings = [];
+      frets.forEach((f, si) => {
+        if (f >= 0 && mod12(tuningPitches[si] + f) === root) rootStrings.push(si);
+      });
+      if (rootStrings.length === 0) continue;
+
+      const cand = {
+        frets,
+        baseFret,
+        span,
+        rootStrings,
+        fingers: assignFingers(frets),
+        group: classifyVoicing({ frets, baseFret }, true),
+        label: `${shape} 型`,
+        cageShape: shape,
+        source: "caged",
+      };
+      // 取把位最低（优先含空弦的开放形态）
+      const score = baseFret * 10 + (frets.includes(0) ? -1 : 0);
+      if (!best || score < best._s) {
+        cand._s = score;
+        best = cand;
+      }
+    }
+    if (best) {
+      delete best._s;
+      out.push(best);
+    }
+  }
+  return out;
 }
 
 /* ---------- 指法搜索 ----------
@@ -656,7 +777,7 @@ function findVoicings(root, type, tuningPitches, opts = {}) {
  */
 function extendedVoicings(typeId, rootSemitone, tuningPitches, opts = {}) {
   const type = CHORD_TYPE_MAP[typeId];
-  if (!type) return { must: [], open: [], moveable: [], capo: [] };
+  if (!type) return { must: [], open: [], moveable: [], capo: [], caged: [] };
 
   const capo = opts.capo ?? 0;
   const maxSpan = opts.maxSpan ?? 4;
@@ -799,11 +920,23 @@ function extendedVoicings(typeId, rootSemitone, tuningPitches, opts = {}) {
     return played.length >= 2 && pressed.length > 0 && v.rootStrings && v.rootStrings.length > 0;
   };
 
+  // CAGED 五型：由度数模板生成（含开放形态），按 C→A→G→E→D 顺序，缺失的型不列出。
+  const rawCaged = generateCaged(typeId, rootSemitone, tuningPitches);
+  const cagedByShape = new Map();
+  for (const v of rawCaged) {
+    if (!cagedByShape.has(v.cageShape) || v.baseFret < cagedByShape.get(v.cageShape).baseFret) {
+      cagedByShape.set(v.cageShape, v);
+    }
+  }
+  const CAGED_ORDER = ["C", "A", "G", "E", "D"];
+  const caged = CAGED_ORDER.filter((s) => cagedByShape.has(s)).map((s) => cagedByShape.get(s));
+
   return {
     must: must.filter(isValid),
     open: open.filter(isValid),
     moveable: moveable.filter(isValid),
     capo: capoArr.filter(isValid),
+    caged: caged.filter(isValid),
   };
 }
 

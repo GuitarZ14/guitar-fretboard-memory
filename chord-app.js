@@ -824,7 +824,7 @@ function renderVoicings() {
     elements.voicingArea.hidden = false;
 
     const groups = extendedVoicings(state.typeId, state.root, tuning.pitches);
-    const total = groups.must.length + groups.open.length + groups.moveable.length;
+    const total = groups.open.length + groups.moveable.length + groups.caged.length;
 
     if (total === 0) {
       elements.voicingArea.innerHTML = `
@@ -837,7 +837,7 @@ function renderVoicings() {
       return;
     }
 
-    const sectionHTML = (label, items) =>
+    const sectionHTML = (label, items, withShapeTag) =>
       items.length === 0 ? "" : `
         <div class="voicing-section">
           <h3 class="voicing-section-title">${label}<span class="voicing-section-count">${items.length}</span></h3>
@@ -847,6 +847,7 @@ function renderVoicings() {
                 (v) => `
               <figure class="voicing-card">
                 <div class="chord-diagram">${buildVoicingSVG(v, type, tuning)}</div>
+                ${withShapeTag && v.cageShape ? `<figcaption class="voicing-shape-tag">${v.cageShape} 型</figcaption>` : ""}
               </figure>`
               )
               .join("")}
@@ -881,9 +882,9 @@ function renderVoicings() {
 
     elements.voicingArea.innerHTML =
       detailHTML +
-      sectionHTML("MUST KNOW 必学", groups.must) +
-      sectionHTML("OPEN CHORDS 开放和弦", groups.open) +
-      sectionHTML("MOVEABLE 可移位", groups.moveable);
+      sectionHTML("开放式和弦（含空弦）", groups.open) +
+      sectionHTML("封闭式和弦（横按 / 可移位）", groups.moveable) +
+      sectionHTML("CAGED 五型指法", groups.caged, true);
 
     // 绑定返回按钮（重新渲染后元素是新节点，需重新绑定）
     const backBtn = document.getElementById("pickerBackBtn");
