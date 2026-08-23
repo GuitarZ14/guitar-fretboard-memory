@@ -582,22 +582,19 @@ function getPracticeNotes() {
   const { min, max } = state.practice.fretRange;
   const strings = state.practice.strings;
 
-  // 只保留在「选中弦组 + 当前品格区间」内、存在【至少两个】相同音高位置的音名。
-  // 同一音高在范围内必须能在至少两处（可同弦不同品，或不同弦）被点中，
-  // 否则题目将因「只有一个可点位置」而无解。例如 1弦+2弦限定 4~7 品时，
-  // 范围里若只有 1弦7品为 B，则 B 仅 1 个位置，不应作为题目。
+  // 题目池 = 选定「弦组 + 品格区间」内出现过的全部音名（去重）。
+  // 不要求同一音高存在≥2个位置：单弦任意范围均可出题（每音只点1处）；
+  // 多弦范围合并所有音符，某音出现 N 次则本题需点 N 处才能过关。
   return base.filter((note) => {
-    let positions = 0;
     for (const stringIndex of strings) {
       const pitch = STRINGS[stringIndex - 1].pitch;
       for (let fret = min; fret <= max; fret += 1) {
         if (CHROMATIC[(pitch + fret) % 12] === note.pitch) {
-          positions += 1;
-          if (positions >= 2) return true;
+          return true; // 在该范围内至少出现一次即可作为题目
         }
       }
     }
-    return positions >= 2;
+    return false;
   });
 }
 
@@ -606,8 +603,8 @@ function hasSolvableConfig() {
   return getPracticeNotes().length > 0;
 }
 
-/* 自动调整配置以生成有效题目池：先尝试全部弦，再尝试完整品格范围。
-   返回是否成功；全部弦 + 0-24 品在常规设置下一定有解。 */
+/* 防御性兜底：当前规则下只要有弦组就一定有题（范围内出现的音名都可作为题目），
+   故本函数仅在「弦组为空」等极端情况下被调用——此时回退为全部弦。 */
 function ensureSolvableConfig() {
   if (hasSolvableConfig()) return true;
 
@@ -727,7 +724,7 @@ function onCellClick(cell) {
       if (state.note) {
         setAnswerStatus("本题已作答，请点击「下一题」继续");
       } else {
-        setAnswerStatus("在选定范围内没有相同的音，请扩大品格区间或重新勾选弦组后再开始。");
+        setAnswerStatus("请先在「选择弦组」中勾选至少一根弦，再开始点按练习。");
       }
     }
     return;
@@ -857,17 +854,10 @@ function closeSummary() {
 function startPracticeRound() {
   state.practice.accidentals = accidentalsOn();
   const notes = getPracticeNotes();
-  // 弦组为空（默认全灰、用户尚未勾选，或所选弦在品格区间内没有共同音名）：
-  // 提示先选择弦组，不进入出题，避免空集直接结算
+  // 题目池为空（仅在「弦组为空」时出现；选定范围内出现的音名都可作为题目，
+  // 只要有弦组就必然有题）。提示先选弦组，不进入出题，避免空集直接结算。
   if (notes.length === 0) {
-    if (!Array.isArray(state.practice.strings) || state.practice.strings.length === 0) {
-      setAnswerStatus("请在「选择弦组」中至少勾选一根弦，再开始练习。");
-    } else {
-      // 已勾选弦组，但「选中弦 + 品格区间」内没有任何音高存在至少两个相同位置，
-      // 无法保证每题有解：弹窗提示并禁止生成无解题目。
-      setAnswerStatus("在选定范围内没有相同的音，请扩大品格区间或重新勾选弦组后再开始。");
-      window.alert("在选定范围内没有相同的音");
-    }
+    setAnswerStatus("请在「选择弦组」中至少勾选一根弦，再开始练习。");
     state.practice.started = false;
     state.practice.phase = "done"; // 防止点击被当作 pending 题目评分
     state.practice.roundTotal = 0;

@@ -291,10 +291,39 @@ async function box(page, sel) {
   const dimmed = await page.$$eval('.fretboard .fret-cell.dimmed', (els) => els.length);
   check('拖动难度上限滑块 → 指板置灰（dimmed > 0）', dimmed > 0, 'dimmed=' + dimmed);
 
-  // 出题无解校验回归：1弦+2弦 限定 4~7 品时，范围内没有任何音高存在≥2个相同位置，
-  // 点击开始应弹出「在选定范围内没有相同的音」，且不进入答题（currentNote 不应变成新题目）。
+  // 新规则回归：题目池 = 选定范围内出现过的全部音名（出现即出题，不再要求≥2个位置）。
+  // 1) 单弦(1弦) 0~5 品：范围内 E/F/F#/G/G#/A 均可出题，无 alert，且每题只需点 1 处即可过关
+  await page.evaluate(() => {
+    document.querySelectorAll('.string-btn').forEach((b) => {
+      const s = Number(b.dataset.string);
+      if ((b.getAttribute('aria-pressed') === 'true') !== (s === 1)) b.click();
+    });
+    const mn = document.querySelector('#fretRangeMinInput');
+    const mx = document.querySelector('#fretRangeMaxInput');
+    mn.value = 0; mn.dispatchEvent(new Event('input', { bubbles: true }));
+    mx.value = 5; mx.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  await page.waitForTimeout(300);
   let dialogMsg = null;
   page.once('dialog', async (d) => { dialogMsg = d.message(); await d.dismiss(); });
+  await page.evaluate(() => { const nb = document.querySelector('#nextButton'); if (nb) nb.click(); });
+  await page.waitForTimeout(300);
+  const singleNote = await page.$eval('#currentNote', (el) => el.textContent.trim());
+  check('单弦 0~5 品可正常出题（无 alert）', dialogMsg === null && singleNote !== '—', 'note=' + singleNote + ' dialog=' + JSON.stringify(dialogMsg));
+
+  // 单弦点击正确音即过关（每题只需点 1 处）
+  const singleCleared = await page.evaluate(() => {
+    const noteText = document.querySelector('#currentNote').textContent.trim();
+    const pitchMap = {'C':'C','C♯':'C#','D♭':'C#','D':'D','D♯':'D#','E♭':'D#','E':'E','F':'F','F♯':'F#','G♭':'F#','G':'G','G♯':'G#','A♭':'G#','A':'A','A♯':'A#','B♭':'A#','B':'B'};
+    const tp = pitchMap[noteText];
+    const c = Array.from(document.querySelectorAll('.fret-cell')).find((x) => x.dataset.pitch === tp && Number(x.dataset.fret) <= 5 && !x.classList.contains('dimmed'));
+    if (!c) return 'no-cell';
+    c.click();
+    return document.querySelectorAll('#answerStatus span')[1]?.textContent ?? '';
+  });
+  check('单弦点击正确音即过关（全部找齐）', /全部找齐/.test(singleCleared), 'status=' + singleCleared);
+
+  // 2) 多弦(1弦+2弦) 4~7 品：范围内有 F#/G/G#/A/A#/B，新规则下有解、无 alert
   await page.evaluate(() => {
     document.querySelectorAll('.string-btn').forEach((b) => {
       const s = Number(b.dataset.string);
@@ -306,14 +335,14 @@ async function box(page, sel) {
     mn.value = 4; mn.dispatchEvent(new Event('input', { bubbles: true }));
     mx.value = 7; mx.dispatchEvent(new Event('input', { bubbles: true }));
   });
-  await page.waitForTimeout(200);
-  // 复位上题状态，确保重新 startRound
-  await page.evaluate(() => {
-    const sb = document.querySelector('#nextNoteBtn') || document.querySelector('#startRoundBtn');
-    if (sb) sb.click();
-  });
-  await page.waitForTimeout(500);
-  check('无解区间 → 弹窗「在选定范围内没有相同的音」', dialogMsg === '在选定范围内没有相同的音', 'dialog=' + JSON.stringify(dialogMsg));
+  await page.waitForTimeout(300);
+  let dialogMsg2 = null;
+  page.once('dialog', async (d) => { dialogMsg2 = d.message(); await d.dismiss(); });
+  await page.evaluate(() => { const nb = document.querySelector('#nextButton'); if (nb) nb.click(); });
+  await page.waitForTimeout(300);
+  const multiNote = await page.$eval('#currentNote', (el) => el.textContent.trim());
+  check('多弦 4~7 品新规则下有解（无 alert）', dialogMsg2 === null && multiNote !== '—', 'note=' + multiNote + ' dialog=' + JSON.stringify(dialogMsg2));
+
 
   // ============ 视觉检查（黏土浅色主题） ============
   console.log('\n[视觉检查]');
