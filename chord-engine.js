@@ -478,6 +478,9 @@ function transposedShapes(typeId, targetRoot, tuningPitches, opts = {}) {
   for (const sh of SHAPES) {
     if (!sh.types.includes(typeId)) continue;
     const trans = targetRoot - sh.base;
+    // 含空弦的形状（如 C 形开放和弦）不能整体移调：空弦音高固定，移位会变错音。
+    // 只有 root === base（即 C 基准）时才可直接沿用；其它根音靠算法生成开放把位。
+    if (sh.frets.some((f) => f === 0) && trans !== 0) continue;
     // 同一个形状尝试 trans 与 trans-12 两个八度，取把位更低（baseFret 更小）的合法候选。
     // 这样 CAGED 各形状对每一个根音都能落在尽量低的品位，而不是被推到高把位。
     let best = null;
@@ -707,9 +710,12 @@ function generateCaged(typeId, root, tuningPitches) {
  */
 function classifyVoicing(v, baseOpen = false) {
   const { frets, baseFret } = v;
-  // 真正的"open"：baseFret 为 0 且至少有一根空弦（6 弦空或 1 弦空）
-  if (baseFret === 0 && frets.some((f) => f === 0)) return "open";
-  // 其它（有横按或按弦的）统称 moveable
+  // 开放和弦：第一把位、含有空弦，且所有按弦品位都在 1~3 品（真正的开放把位指法）。
+  // 这样不会因为把位高、只是恰好碰到空弦而被误判为"开放"（例如 G 根音把 x10980 形状）。
+  const hasOpen = frets.some((f) => f === 0);
+  const maxPressed = frets.filter((f) => f > 0).reduce((m, f) => Math.max(m, f), 0);
+  if (hasOpen && maxPressed <= 3) return "open";
+  // 其它（横按或更高把位）统称 moveable
   return "moveable";
 }
 
