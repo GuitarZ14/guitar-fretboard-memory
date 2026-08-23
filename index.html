@@ -9,8 +9,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="styles.css?v=22" />
-    <link rel="stylesheet" href="fretboard-fullscreen.css?v=1" />
+    <link rel="stylesheet" href="styles.css?v=23" />
   </head>
   <body>
     <main class="app-shell">
@@ -170,7 +169,6 @@
               <button class="mode-tab active" id="browseModeTab" type="button" role="tab" aria-selected="true" data-mode="browse">查看</button>
               <button class="mode-tab" id="practiceModeTab" type="button" role="tab" aria-selected="false" data-mode="practice">点按</button>
             </div>
-            <button class="fb-fullscreen-btn" id="fbFullscreenBtn" type="button" aria-label="指板全屏放大与标注">⤢ 全屏标注</button>
 
             <div class="answer-status" id="answerStatus">
               <span aria-hidden="true">●</span>
@@ -220,19 +218,7 @@
       </div>
     </div>
 
-    <script src="app.js?v=17"></script>
-    <script src="fretboard-annotate.js?v=1"></script>
-    <script>
-      // 指板全屏放大 + 自由标注
-      (function () {
-        var btn = document.getElementById('fbFullscreenBtn');
-        if (!btn) return;
-        btn.addEventListener('click', function () {
-          var el = document.querySelector('#fretboard svg') || document.querySelector('#fretboard');
-          if (window.FretboardAnnotate) window.FretboardAnnotate.open(el, '六弦吉他指板');
-        });
-      })();
-    </script>
+    <script src="app.js?v=18"></script>
     <script>
       // 滚动触发入场动画：进入视口时添加 .in-view（播放一次）
       (function () {

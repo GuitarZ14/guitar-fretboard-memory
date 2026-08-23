@@ -356,8 +356,8 @@ const state = {
     wrongInQuestion: 0,
     phase: "pending", // pending | done
     firstClick: true,
-    targetStrings: new Set(), // 当前题需要点击的弦（仅含在品格区间内有答案的选中弦）
-    foundStrings: new Set(),  // 当前题已正确点击的弦
+    targetStrings: new Set(), // 当前题所有需要点击的位置（键为 `${stringIndex}-${fret}`，即范围内该音高的全部可点击位置）
+    foundStrings: new Set(),  // 当前题已正确点击的位置（同款键值）
     advanceTimer: null,
     lastAdvanceAt: 0, // drawNextNote 防重入去抖时间戳
   },
@@ -563,23 +563,22 @@ function getPracticeNotes() {
   const { min, max } = state.practice.fretRange;
   const strings = state.practice.strings;
 
-  // 只保留在「选中弦组 + 当前品格区间」内、可在【至少两根】选中弦上找到位置的音名。
-  // 这样可以避免题目音名只在区域内一根（或不足两根）弦上出现导致的「点击无响应」问题。
+  // 只保留在「选中弦组 + 当前品格区间」内、存在【至少两个】相同音高位置的音名。
+  // 同一音高在范围内必须能在至少两处（可同弦不同品，或不同弦）被点中，
+  // 否则题目将因「只有一个可点位置」而无解。例如 1弦+2弦限定 4~7 品时，
+  // 范围里若只有 1弦7品为 B，则 B 仅 1 个位置，不应作为题目。
   return base.filter((note) => {
-    let count = 0;
+    let positions = 0;
     for (const stringIndex of strings) {
       const pitch = STRINGS[stringIndex - 1].pitch;
-      let found = false;
       for (let fret = min; fret <= max; fret += 1) {
         if (CHROMATIC[(pitch + fret) % 12] === note.pitch) {
-          found = true;
-          break;
+          positions += 1;
+          if (positions >= 2) return true;
         }
       }
-      if (found) count += 1;
-      if (count >= 2) return true;
     }
-    return count >= 2;
+    return positions >= 2;
   });
 }
 
@@ -607,18 +606,21 @@ function updateStats() {
   elements.statBest.textContent = `${getBestForDifficulty()}%`;
 }
 
-/* 当前题需要在「选中弦组 + 品格区间」内逐一找出的弦集合（1-based string index）。
-   只包含有目标音高的弦；没有该音的选中弦不强制点击。 */
+/* 当前题在「选中弦组 + 品格区间」内需要逐个点击的全部位置集合。
+   每个元素为 `${stringIndex}-${fret}` 键（1-based string index）。
+   题目生成已保证该音高在范围内至少有两个位置，故每道题都有解。 */
 function getTargetStrings(note = ensureValidNote()) {
   const { min, max } = state.practice.fretRange;
-  const indices = state.practice.strings.filter((stringIndex) => {
+  const positions = new Set();
+  for (const stringIndex of state.practice.strings) {
     const pitch = STRINGS[stringIndex - 1].pitch;
     for (let fret = min; fret <= max; fret += 1) {
-      if (CHROMATIC[(pitch + fret) % 12] === note.pitch) return true;
+      if (CHROMATIC[(pitch + fret) % 12] === note.pitch) {
+        positions.add(`${stringIndex}-${fret}`);
+      }
     }
-    return false;
-  });
-  return new Set(indices);
+  }
+  return positions;
 }
 
 function updateDimmedCells() {
@@ -655,7 +657,7 @@ function startQuestion() {
   const note = ensureValidNote();
   const targetCount = state.practice.targetStrings.size;
   const status = targetCount > 1
-    ? `在指板上找出 ${note.display} 的位置（需找 ${targetCount} 根弦）`
+    ? `在指板上找出 ${note.display} 的位置（需找 ${targetCount} 处）`
     : `在指板上找出 ${note.display} 的位置`;
   setAnswerStatus(status);
   updateStats();
@@ -682,30 +684,32 @@ function onCellClick(cell) {
 
   const note = ensureValidNote();
   const stringIndex = Number(cell.dataset.stringIndex);
+  const fret = Number(cell.dataset.fret);
+  const posKey = `${stringIndex}-${fret}`;
 
   if (cell.dataset.pitch === note.pitch) {
     cell.blur();
 
-    // 正确音高但不在当前题目要求的弦上（理论上已被 dimmed 屏蔽点击，兜底处理）
-    if (!state.practice.targetStrings.has(stringIndex)) {
+    // 正确音高但不在当前题目要求的范围内位置（理论上已被 dimmed 屏蔽点击，兜底处理）
+    if (!state.practice.targetStrings.has(posKey)) {
       state.practice.firstClick = false;
       state.practice.wrongInQuestion += 1;
       state.practice.wrongClicks += 1;
       cell.classList.remove("miss");
       void cell.offsetWidth;
       cell.classList.add("miss");
-      setAnswerStatus("不对，这条弦不在当前练习范围内");
+      setAnswerStatus("不对，这个位置不在当前练习范围内");
       setTimeout(() => cell.classList.remove("miss"), 640);
       return;
     }
 
-    // 同一弦重复点击不重复计数
-    if (state.practice.foundStrings.has(stringIndex)) {
-      setAnswerStatus("这根弦已经找过了，继续找其他弦");
+    // 同一位置重复点击不重复计数
+    if (state.practice.foundStrings.has(posKey)) {
+      setAnswerStatus("这个位置已经找过了，继续找其他位置");
       return;
     }
 
-    state.practice.foundStrings.add(stringIndex);
+    state.practice.foundStrings.add(posKey);
     cell.classList.add("hit");
     const found = state.practice.foundStrings.size;
     const total = state.practice.targetStrings.size;
@@ -722,7 +726,7 @@ function onCellClick(cell) {
       clearTimeout(state.practice.advanceTimer);
       state.practice.advanceTimer = setTimeout(() => newRound(), 1500);
     } else {
-      setAnswerStatus(`已找到 ${found}/${total} 根弦，继续找 ${note.display}`);
+      setAnswerStatus(`已找到 ${found}/${total} 处，继续找 ${note.display}`);
       updateStats();
     }
   } else {
@@ -807,10 +811,11 @@ function startPracticeRound() {
   if (notes.length === 0) {
     if (!Array.isArray(state.practice.strings) || state.practice.strings.length === 0) {
       setAnswerStatus("请在「选择弦组」中至少勾选一根弦，再开始练习。");
-    } else if (state.practice.strings.length === 1) {
-      setAnswerStatus("当前仅勾选了一根弦，无法保证每题都有多处可点击位置，请至少勾选两根弦。");
     } else {
-      setAnswerStatus("所选弦组在「品格区间」内没有同时出现在两根及以上弦上的音名，请扩大品格区间或重新勾选弦组。");
+      // 已勾选弦组，但「选中弦 + 品格区间」内没有任何音高存在至少两个相同位置，
+      // 无法保证每题有解：弹窗提示并禁止生成无解题目。
+      setAnswerStatus("在选定范围内没有相同的音，请扩大品格区间或重新勾选弦组后再开始。");
+      window.alert("在选定范围内没有相同的音");
     }
     state.practice.started = false;
     state.practice.roundTotal = 0;

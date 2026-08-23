@@ -291,6 +291,30 @@ async function box(page, sel) {
   const dimmed = await page.$$eval('.fretboard .fret-cell.dimmed', (els) => els.length);
   check('拖动难度上限滑块 → 指板置灰（dimmed > 0）', dimmed > 0, 'dimmed=' + dimmed);
 
+  // 出题无解校验回归：1弦+2弦 限定 4~7 品时，范围内没有任何音高存在≥2个相同位置，
+  // 点击开始应弹出「在选定范围内没有相同的音」，且不进入答题（currentNote 不应变成新题目）。
+  let dialogMsg = null;
+  page.once('dialog', async (d) => { dialogMsg = d.message(); await d.dismiss(); });
+  await page.evaluate(() => {
+    document.querySelectorAll('.string-btn').forEach((b) => {
+      const s = Number(b.dataset.string);
+      const want = s === 1 || s === 2;
+      if ((b.getAttribute('aria-pressed') === 'true') !== want) b.click();
+    });
+    const mn = document.querySelector('#fretRangeMinInput');
+    const mx = document.querySelector('#fretRangeMaxInput');
+    mn.value = 4; mn.dispatchEvent(new Event('input', { bubbles: true }));
+    mx.value = 7; mx.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  await page.waitForTimeout(200);
+  // 复位上题状态，确保重新 startRound
+  await page.evaluate(() => {
+    const sb = document.querySelector('#nextNoteBtn') || document.querySelector('#startRoundBtn');
+    if (sb) sb.click();
+  });
+  await page.waitForTimeout(500);
+  check('无解区间 → 弹窗「在选定范围内没有相同的音」', dialogMsg === '在选定范围内没有相同的音', 'dialog=' + JSON.stringify(dialogMsg));
+
   // ============ 视觉检查（黏土浅色主题） ============
   console.log('\n[视觉检查]');
   const bg = await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--bg').trim());
