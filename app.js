@@ -31,7 +31,7 @@ const FRET_RANGE_STORAGE_KEY = "guitar-fretboard-fret-range";
 const STRING_STORAGE_KEY = "guitar-fretboard-strings";
 const MIN_FRET = 0;
 const MAX_FRET = 24;
-const DEFAULT_FRET_RANGE = { min: MIN_FRET, max: 12 };
+const DEFAULT_FRET_RANGE = { min: 1, max: 15 };
 const NATURAL_NOTE_KEYS = new Set(["C", "D", "E", "F", "G", "A", "B"]);
 const CHROMATIC = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
 const PITCH_DISPLAY = {
@@ -563,18 +563,24 @@ function getPracticeNotes() {
   const { min, max } = state.practice.fretRange;
   const strings = state.practice.strings;
 
-  // 只保留在「选中弦组 + 当前品格区间」内、可在【每一根】选中弦上都找到位置的音名。
-  // 这样每道题的 targetStrings 就等于完整的选中弦组，提示词的「需找 N 根弦」与
-  // 实际勾选的弦数一致，且必须点齐所有选中弦才会进入下一题。
-  return base.filter((note) =>
-    strings.every((stringIndex) => {
+  // 只保留在「选中弦组 + 当前品格区间」内、可在【至少两根】选中弦上找到位置的音名。
+  // 这样可以避免题目音名只在区域内一根（或不足两根）弦上出现导致的「点击无响应」问题。
+  return base.filter((note) => {
+    let count = 0;
+    for (const stringIndex of strings) {
       const pitch = STRINGS[stringIndex - 1].pitch;
+      let found = false;
       for (let fret = min; fret <= max; fret += 1) {
-        if (CHROMATIC[(pitch + fret) % 12] === note.pitch) return true;
+        if (CHROMATIC[(pitch + fret) % 12] === note.pitch) {
+          found = true;
+          break;
+        }
       }
-      return false;
-    }),
-  );
+      if (found) count += 1;
+      if (count >= 2) return true;
+    }
+    return count >= 2;
+  });
 }
 
 function getBestKey() {
@@ -801,8 +807,10 @@ function startPracticeRound() {
   if (notes.length === 0) {
     if (!Array.isArray(state.practice.strings) || state.practice.strings.length === 0) {
       setAnswerStatus("请在「选择弦组」中至少勾选一根弦，再开始练习。");
+    } else if (state.practice.strings.length === 1) {
+      setAnswerStatus("当前仅勾选了一根弦，无法保证每题都有多处可点击位置，请至少勾选两根弦。");
     } else {
-      setAnswerStatus("所选弦组在「品格区间」内没有共同的音名，请扩大品格区间或重新勾选弦组。");
+      setAnswerStatus("所选弦组在「品格区间」内没有同时出现在两根及以上弦上的音名，请扩大品格区间或重新勾选弦组。");
     }
     state.practice.started = false;
     state.practice.roundTotal = 0;

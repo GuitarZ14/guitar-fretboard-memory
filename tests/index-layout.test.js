@@ -82,10 +82,10 @@ async function box(page, sel) {
   check('存在左侧栏(.sidebar-left)', !!leftSidebar);
   check('存在右侧栏(.sidebar-right)', !!rightSidebar);
   check('存在当前音名列(.current-note-col)', !!noteCol);
-  // 三栏横向并列：左 < 右 < 中 (当前音名) 大致从左到右
-  check('三栏横向并列（左 < 右 < 当前音名）',
-    leftSidebar.x < rightSidebar.x - 20 && rightSidebar.x < noteCol.x - 20,
-    `L.x=${leftSidebar.x.toFixed(0)} R.x=${rightSidebar.x.toFixed(0)} N.x=${noteCol.x.toFixed(0)}`);
+  // 三栏横向并列（左-中-右）：全指板找音模式(左) < 当前音名(中) < 自由找音模式(右)
+  check('三栏横向并列（左 < 当前音名 < 右）',
+    leftSidebar.x < noteCol.x - 20 && noteCol.x < rightSidebar.x - 20,
+    `L.x=${leftSidebar.x.toFixed(0)} N.x=${noteCol.x.toFixed(0)} R.x=${rightSidebar.x.toFixed(0)}`);
   check('三栏顶部基本对齐', Math.abs(leftSidebar.y - rightSidebar.y) < 8 && Math.abs(rightSidebar.y - noteCol.y) < 8,
     `L.y=${leftSidebar.y.toFixed(0)} R.y=${rightSidebar.y.toFixed(0)} N.y=${noteCol.y.toFixed(0)}`);
 
@@ -142,10 +142,10 @@ async function box(page, sel) {
   const noteBox = await box(page, '.current-note-col');
   const mFret = await box(page, '.fretboard-section');
 
-  // 三栏纵向堆叠：左栏 → 右栏 → 当前音名 → 指板
-  check('移动端三栏纵向堆叠（左栏在上、右栏其次、当前音名再次）',
-    leftBox.y < rightBox.y - 4 && rightBox.y < noteBox.y - 4,
-    `L.y=${leftBox.y.toFixed(0)} R.y=${rightBox.y.toFixed(0)} N.y=${noteBox.y.toFixed(0)}`);
+  // 三栏纵向堆叠：左栏(全指板) → 当前音名 → 右栏(自由找音) → 指板
+  check('移动端三栏纵向堆叠（左栏在上、当前音名其次、右栏再次）',
+    leftBox.y < noteBox.y - 4 && noteBox.y < rightBox.y - 4,
+    `L.y=${leftBox.y.toFixed(0)} N.y=${noteBox.y.toFixed(0)} R.y=${rightBox.y.toFixed(0)}`);
   check('移动端指板区在最下方', mFret.y > noteBox.y + 4, `fret.y=${mFret.y.toFixed(0)} N.y=${noteBox.y.toFixed(0)}`);
 
   // 侧栏各含 1 张卡片、宽度铺满
@@ -240,7 +240,7 @@ async function box(page, sel) {
   const slBox = await box(page, '.sidebar-left');
   const srBox = await box(page, '.sidebar-right');
   const snBox = await box(page, '.current-note-col');
-  check('矮视口三栏纵向堆叠', slBox.y < srBox.y - 4 && srBox.y < snBox.y - 4, `L.y=${slBox.y.toFixed(0)} R.y=${srBox.y.toFixed(0)} N.y=${snBox.y.toFixed(0)}`);
+  check('矮视口三栏纵向堆叠（左 < 当前音名 < 右）', slBox.y < snBox.y - 4 && snBox.y < srBox.y - 4, `L.y=${slBox.y.toFixed(0)} N.y=${snBox.y.toFixed(0)} R.y=${srBox.y.toFixed(0)}`);
   check('矮视口三栏均铺满宽度', slBox.w > 200 && srBox.w > 200 && snBox.w > 200, `L.w=${slBox.w.toFixed(0)} R.w=${srBox.w.toFixed(0)} N.w=${snBox.w.toFixed(0)}`);
 
 
