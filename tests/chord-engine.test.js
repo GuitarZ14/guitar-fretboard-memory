@@ -172,7 +172,7 @@ check("和弦符号生成", () => {
   assert.strictEqual(chordSymbol(9, CHORD_TYPE_MAP.minor, "sharp"), "Am");
   assert.strictEqual(chordSymbol(9, CHORD_TYPE_MAP["7"], "sharp"), "A7");
   assert.strictEqual(chordSymbol(10, CHORD_TYPE_MAP.maj7, "flat"), "Bbmaj7");
-  assert.strictEqual(chordSymbol(2, CHORD_TYPE_MAP["6/9"], "sharp"), "D6/9");
+  assert.strictEqual(chordSymbol(2, CHORD_TYPE_MAP["6/9"], "sharp"), "D69");
 });
 
 check("组成音标签统一为数字音级（maj7→7，m3→b3）", () => {

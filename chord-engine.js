@@ -8,7 +8,7 @@
  * 可在浏览器与 Node（module.exports）中共同使用。
  *
  * 和弦类型系统完全对齐 oolimo.com：
- *  - 符号：^（大三/属七）、°（减）、maj7 / m7b5 / 6/9 / 7b9b13 / 7#11 / alt 等
+ *  - 符号：^（大三/属七）、°（减）、maj7 / m7b5 / 69 / 7b9b13 / 7#11 / alt 等
  *  - 分组：Triads / Four tone / Extended / Altered / m(maj) / Power / Add-Sus
  *  - 音程：半音数表，按 oolimo 表格精确对照
  */
@@ -154,7 +154,7 @@ const CHORD_TYPES = [
     desc: "小七和弦叠加九度音，柔和而富有爵士质感，常在小调 ii–V–I 中使用。",
   },
   {
-    id: "6/9", group: "extended", suffix: "6/9", cn: "六九和弦",
+    id: "6/9", group: "extended", suffix: "69", cn: "六九和弦",
     intervals: [0, 4, 7, 9, 14], labels: ["1", "3", "5", "6", "9"],
     desc: "在六和弦基础上去掉七度并叠加九度，明亮、开放、无压迫感，是 R&B 与放克的和声底色。",
   },
@@ -353,6 +353,18 @@ function buildFingering(frets) {
       }
     }
     subgroups.push({ fret: f, strings: cur });
+  }
+
+  // 非最低品位的同指组必须连续：一根手指按同品位多弦时，只能按住相邻的弦；
+  // 若弦之间有间隔，则手指会悬空跨过中间弦，无法用正常手型实现（最低品除外，
+  // 可做完整大/小横按）。
+  for (let gi = 0; gi < subgroups.length; gi += 1) {
+    const sg = subgroups[gi];
+    // 最低品位允许大横按，不检查连续性
+    if (sg.fret === minFret) continue;
+    for (let i = 1; i < sg.strings.length; i += 1) {
+      if (sg.strings[i] !== sg.strings[i - 1] + 1) return { subgroups: Infinity, fingers };
+    }
   }
 
   // 分配手指：从低到高，同品位从左到右
@@ -737,11 +749,14 @@ function generateCaged(typeId, root, tuningPitches) {
  */
 function classifyVoicing(v, baseOpen = false) {
   const { frets, baseFret } = v;
-  // 开放和弦：第一把位、含有空弦，且所有按弦品位都在 1~3 品（真正的开放把位指法）。
-  // 这样不会因为把位高、只是恰好碰到空弦而被误判为"开放"（例如 G 根音把 x10980 形状）。
+  // 开放和弦：含空弦且基础把位低（≤4 品），并把位内跨度不大。
+  // 这样 A69 的 x 0 4 4 2 0 等标准开放把位会被正确归类为 open，
+  // 同时高把位含空弦的形状（如 x 10 9 8 0 0）仍归为 moveable。
   const hasOpen = frets.some((f) => f === 0);
-  const maxPressed = frets.filter((f) => f > 0).reduce((m, f) => Math.max(m, f), 0);
-  if (hasOpen && maxPressed <= 3) return "open";
+  const pressed = frets.filter((f) => f > 0);
+  const maxPressed = pressed.length ? Math.max(...pressed) : 0;
+  const span = pressed.length ? maxPressed - Math.min(...pressed) : 0;
+  if (hasOpen && baseFret <= 4 && span <= 4) return "open";
   // 其它（横按或更高把位）统称 moveable
   return "moveable";
 }
