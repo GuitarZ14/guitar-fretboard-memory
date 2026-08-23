@@ -380,7 +380,6 @@ const elements = {
   autoRevealSetting: document.querySelector("#autoRevealSetting"),
   autoRevealCard: document.querySelector("#autoRevealCard"),
   accidentalsToggle: document.querySelector("#accidentalsToggle"),
-  accidentalsCard: document.querySelector("#accidentalsCard"),
   difficultyCard: document.querySelector("#difficultyCard"),
   fretRangeMin: document.querySelector("#fretRangeMin"),
   fretRangeMax: document.querySelector("#fretRangeMax"),
@@ -408,8 +407,12 @@ const elements = {
   revealProgress: document.querySelector("#revealProgress"),
 };
 
+function accidentalsOn() {
+  return elements.accidentalsToggle.getAttribute("aria-pressed") === "true";
+}
+
 function getActiveNotes() {
-  return elements.accidentalsToggle.checked
+  return accidentalsOn()
     ? NOTES
     : NOTES.filter((note) => NATURAL_NOTE_KEYS.has(note.key));
 }
@@ -791,7 +794,7 @@ function closeSummary() {
 }
 
 function startPracticeRound() {
-  state.practice.accidentals = elements.accidentalsToggle.checked;
+  state.practice.accidentals = accidentalsOn();
   const notes = getPracticeNotes();
   // 弦组为空（默认全灰、用户尚未勾选，或所选弦在品格区间内没有共同音名）：
   // 提示先选择弦组，不进入出题，避免空集直接结算
@@ -1051,7 +1054,10 @@ function timerLoop(now) {
 elements.nextButton.addEventListener("click", newRound);
 elements.revealButton.addEventListener("click", handleReveal);
 elements.autoRevealToggle.addEventListener("change", syncControlState);
-elements.accidentalsToggle.addEventListener("change", () => {
+elements.accidentalsToggle.addEventListener("click", () => {
+  const on = !accidentalsOn();
+  elements.accidentalsToggle.setAttribute("aria-pressed", String(on));
+  elements.accidentalsToggle.classList.toggle("active", on);
   if (state.mode === "practice") {
     clearTimeout(state.practice.advanceTimer);
     startPracticeRound();

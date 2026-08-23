@@ -10,10 +10,11 @@
  *       （python3 -m http.server 8624）
  *
  * 覆盖：
- *  1. DOM 结构：侧栏(.sidebar-controls) 与 主区(.main-column) 均存在且含预期子元素
- *  2. 桌面布局：侧栏在左、主区在右且顶部对齐；无横向溢出
- *  3. 移动布局：主区在上、控制在下，侧栏卡片呈 2×2 网格（等高/等宽），模式 tab 并排可见
- *  4. 功能：显示答案 / 下一个音 / 模式切换联动禁用 / 升降号开关 / 难度滑块
+ *  1. DOM 结构：顶部三栏(.top-row) —— 左(.sidebar-left 含 autoRevealCard) /
+ *     右(.sidebar-right 含 difficultyCard) / 中(.current-note-col)，下方指板区铺满整列
+ *  2. 桌面布局：三栏横向并列、指板区在下方且宽度铺满；无横向溢出
+ *  3. 移动布局：三栏纵向堆叠、指板区在下，模式 tab 并排可见
+ *  4. 功能：显示答案 / 下一个音 / 模式切换联动禁用 / 升降号按钮(aria-pressed 切换) / 难度滑块
  *  5. 视觉：黏土浅色主题无暗色残留、卡片具备双重阴影
  *  6. 健壮性：无 console 报错、无页面异常、无 404
  *  7. 移动端指板滚动回归：0–24 品全部存在、可横向滚动、第 24 品滚动后完全进入视口
@@ -71,14 +72,26 @@ async function box(page, sel) {
   await page.waitForTimeout(900); // 等待入场动画结束
 
   console.log('\n[桌面布局 1280×900]');
-  const sidebar = await box(page, '.sidebar-controls');
-  const main = await box(page, '.main-column');
+  const topRow = await box(page, '.top-row');
+  const leftSidebar = await box(page, '.sidebar-left');
+  const rightSidebar = await box(page, '.sidebar-right');
+  const noteCol = await box(page, '.current-note-col');
+  const fret = await box(page, '.fretboard-section');
 
-  check('存在 .sidebar-controls 侧栏', !!sidebar);
-  check('存在 .main-column 主区', !!main);
-  check('侧栏在左（x < 主区 x）', sidebar.x < main.x - 50, `sidebar.x=${sidebar.x.toFixed(0)} main.x=${main.x.toFixed(0)}`);
-  check('侧栏与主区顶部基本对齐', Math.abs(sidebar.y - main.y) < 8, `sidebar.y=${sidebar.y.toFixed(0)} main.y=${main.y.toFixed(0)}`);
-  check('主区宽度明显大于侧栏（横向填满）', main.w > sidebar.w * 1.5, `main.w=${main.w.toFixed(0)} sidebar.w=${sidebar.w.toFixed(0)}`);
+  check('存在 .top-row 顶部三栏', !!topRow);
+  check('存在左侧栏(.sidebar-left)', !!leftSidebar);
+  check('存在右侧栏(.sidebar-right)', !!rightSidebar);
+  check('存在当前音名列(.current-note-col)', !!noteCol);
+  // 三栏横向并列：左 < 右 < 中 (当前音名) 大致从左到右
+  check('三栏横向并列（左 < 右 < 当前音名）',
+    leftSidebar.x < rightSidebar.x - 20 && rightSidebar.x < noteCol.x - 20,
+    `L.x=${leftSidebar.x.toFixed(0)} R.x=${rightSidebar.x.toFixed(0)} N.x=${noteCol.x.toFixed(0)}`);
+  check('三栏顶部基本对齐', Math.abs(leftSidebar.y - rightSidebar.y) < 8 && Math.abs(rightSidebar.y - noteCol.y) < 8,
+    `L.y=${leftSidebar.y.toFixed(0)} R.y=${rightSidebar.y.toFixed(0)} N.y=${noteCol.y.toFixed(0)}`);
+
+  // 指板区在下方且铺满整列（宽度接近视口宽度）
+  check('指板区在顶部三栏下方', fret.y > topRow.bottom - 4, `fret.y=${fret.y.toFixed(0)} topRow.bottom=${topRow.bottom.toFixed(0)}`);
+  check('指板区横向铺满（宽度接近视口）', fret.w >= topRow.w - 4, `fret.w=${fret.w.toFixed(0)} topRow.w=${topRow.w.toFixed(0)}`);
 
   // 无横向溢出
   const overflow = await page.evaluate(() => ({
@@ -103,19 +116,15 @@ async function box(page, sel) {
   const topbarCenter = topbarBox.x + topbarBox.w / 2;
   check('双 Tab 在顶栏中大致居中', Math.abs(tabCenter - topbarCenter) < 24, `tabCenter=${tabCenter.toFixed(1)} topbarCenter=${topbarCenter.toFixed(1)}`);
 
-  // 三张控制卡片都在侧栏内
-  const cardsInSidebar = await page.$$eval('.sidebar-controls .control-card', (els) => els.map((e) => e.id));
-  check('侧栏含 3 张控制卡片', cardsInSidebar.length === 3, cardsInSidebar.join(','));
-  check('含 autoRevealCard', cardsInSidebar.includes('autoRevealCard'));
-  check('含 accidentalsCard', cardsInSidebar.includes('accidentalsCard'));
-  check('含 difficultyCard', cardsInSidebar.includes('difficultyCard'));
-  check('卡片顺序：限时模式 → 包含升降号 → 练习难度',
-    JSON.stringify(cardsInSidebar) === JSON.stringify(['autoRevealCard', 'accidentalsCard', 'difficultyCard']),
-    cardsInSidebar.join(' > '));
+  // 左栏：全指板找音模式卡片；右栏：自由找音模式卡片
+  const leftCard = await page.$eval('.sidebar-left .control-card', (el) => el.id);
+  const rightCard = await page.$eval('.sidebar-right .control-card', (el) => el.id);
+  check('左栏含 autoRevealCard（全指板找音模式）', leftCard === 'autoRevealCard', leftCard);
+  check('右栏含 difficultyCard（自由找音模式）', rightCard === 'difficultyCard', rightCard);
 
-  // 指板在主区右侧
-  const fret = await box(page, '.fretboard-section');
-  check('指板区位于主区内（右侧）', fret.x >= main.x - 2 && fret.right <= main.right + 2, `fret.x=${fret.x.toFixed(0)} main.x=${main.x.toFixed(0)}`);
+  // 升降号按钮紧邻显示答案按钮（同处 .note-actions 内）
+  const accInActions = await page.$$eval('.note-actions #accidentalsToggle', (els) => els.length);
+  check('含升降号按钮位于当前音名操作区', accInActions === 1, 'count=' + accInActions);
 
   // 截图
   await page.screenshot({ path: path.resolve(__dirname, '..', 'tests', 'shot-desktop.png') });
@@ -127,27 +136,23 @@ async function box(page, sel) {
   await page.waitForTimeout(700);
 
   console.log('\n[移动布局 390×844]');
-  const sBox = await box(page, '.sidebar-controls');
-  const mBox = await box(page, '.main-column');
-  check('移动端 2×2：主区在上、侧栏在下', mBox.y < sBox.y - 20, `main.y=${mBox.y.toFixed(0)} sidebar.y=${sBox.y.toFixed(0)}`);
+  const mTopRow = await box(page, '.top-row');
+  const leftBox = await box(page, '.sidebar-left');
+  const rightBox = await box(page, '.sidebar-right');
+  const noteBox = await box(page, '.current-note-col');
+  const mFret = await box(page, '.fretboard-section');
 
-  // 侧栏卡片：前两张同行，难度卡片独占第二行（占满整行宽度）
-  const cardBoxes = await page.$$eval('.sidebar-controls .control-card', (els) =>
-    els.map((e) => {
-      const r = e.getBoundingClientRect();
-      return { x: r.x, y: r.y, w: r.width, h: r.height, right: r.right, bottom: r.bottom };
-    })
-  );
-  const [c0, c1, c2] = cardBoxes;
-  check('侧栏含 3 张卡片（DOM 顺序不变）', cardBoxes.length === 3, 'count=' + cardBoxes.length);
-  check('前两张卡片同行（同一行，y 相同）', Math.abs(c0.y - c1.y) < 2, `y0=${c0.y.toFixed(0)} y1=${c1.y.toFixed(0)}`);
-  check('难度卡片独占第二行（在第一行下方）', c2.y > c1.y + 4, `row1.y=${c1.y.toFixed(0)} row2.y=${c2.y.toFixed(0)}`);
-  check('前两张为两列（左右排布、不重叠）', c1.x > c0.x + c0.w - 2 && Math.abs(c1.y - c0.y) < 2, `x0=${c0.x.toFixed(0)} x1=${c1.x.toFixed(0)}`);
-  check('难度卡片占满整行（左对齐列首、右对齐列尾）', c2.x <= c0.x + 1 && c2.right >= c1.right - 1, `x=${c2.x.toFixed(0)}..${c2.right.toFixed(0)}`);
-  const ws = [c0.w, c1.w].map((n) => n.toFixed(0));
-  check('前两张卡片等宽（列宽一致）', Math.abs(c0.w - c1.w) < 1, 'w=' + ws.join(','));
-  const hs = [c0.h, c1.h].map((n) => n.toFixed(0));
-  check('前两张卡片等高（同行等高）', Math.abs(c0.h - c1.h) < 1, 'h=' + hs.join(','));
+  // 三栏纵向堆叠：左栏 → 右栏 → 当前音名 → 指板
+  check('移动端三栏纵向堆叠（左栏在上、右栏其次、当前音名再次）',
+    leftBox.y < rightBox.y - 4 && rightBox.y < noteBox.y - 4,
+    `L.y=${leftBox.y.toFixed(0)} R.y=${rightBox.y.toFixed(0)} N.y=${noteBox.y.toFixed(0)}`);
+  check('移动端指板区在最下方', mFret.y > noteBox.y + 4, `fret.y=${mFret.y.toFixed(0)} N.y=${noteBox.y.toFixed(0)}`);
+
+  // 侧栏各含 1 张卡片、宽度铺满
+  const leftCardW = await page.$eval('.sidebar-left .control-card', (el) => el.getBoundingClientRect().width);
+  const rightCardW = await page.$eval('.sidebar-right .control-card', (el) => el.getBoundingClientRect().width);
+  check('左栏卡片铺满宽度', leftCardW > 200, 'w=' + leftCardW.toFixed(0));
+  check('右栏卡片铺满宽度', rightCardW > 200, 'w=' + rightCardW.toFixed(0));
 
   // 无横向溢出
   const mobOverflow = await page.evaluate(() => ({
@@ -231,22 +236,12 @@ async function box(page, sel) {
   await page.waitForTimeout(500);
 
   console.log('\n[矮视口布局 390×740]');
-  const shortBoxes = await page.$$eval('.sidebar-controls .control-card', (els) =>
-    els.map((e) => {
-      const r = e.getBoundingClientRect();
-      return { x: r.x, y: r.y, w: r.width, h: r.height, right: r.right, bottom: r.bottom };
-    })
-  );
-  const [s0, s1, s2] = shortBoxes;
-  check('矮视口仍为 2 列网格（共 3 张）', shortBoxes.length === 3, 'count=' + shortBoxes.length);
-  check('矮视口前两张同行', Math.abs(s0.y - s1.y) < 2, `y0=${s0.y.toFixed(0)} y1=${s1.y.toFixed(0)}`);
-  check('矮视口难度卡片独占第二行', s2.y > s1.y + 4, `row1.y=${s1.y.toFixed(0)} row2.y=${s2.y.toFixed(0)}`);
-  check('矮视口前两张为两列', s1.x > s0.x + s0.w - 2 && Math.abs(s1.y - s0.y) < 2, `x0=${s0.x.toFixed(0)} x1=${s1.x.toFixed(0)}`);
-  check('矮视口难度卡片占满整行', s2.x <= s0.x + 1 && s2.right >= s1.right - 1, `x=${s2.x.toFixed(0)}..${s2.right.toFixed(0)}`);
-  const sw = [s0.w, s1.w].map((n) => n.toFixed(0));
-  const sh = [s0.h, s1.h].map((n) => n.toFixed(0));
-  check('矮视口前两张卡片等宽', Math.abs(s0.w - s1.w) < 1, 'w=' + sw.join(','));
-  check('矮视口前两张卡片等高', Math.abs(s0.h - s1.h) < 1, 'h=' + sh.join(','));
+  const shortRow = await box(page, '.top-row');
+  const slBox = await box(page, '.sidebar-left');
+  const srBox = await box(page, '.sidebar-right');
+  const snBox = await box(page, '.current-note-col');
+  check('矮视口三栏纵向堆叠', slBox.y < srBox.y - 4 && srBox.y < snBox.y - 4, `L.y=${slBox.y.toFixed(0)} R.y=${srBox.y.toFixed(0)} N.y=${snBox.y.toFixed(0)}`);
+  check('矮视口三栏均铺满宽度', slBox.w > 200 && srBox.w > 200 && snBox.w > 200, `L.w=${slBox.w.toFixed(0)} R.w=${srBox.w.toFixed(0)} N.w=${snBox.w.toFixed(0)}`);
 
 
   // ============ 功能测试（桌面视口） ============
@@ -271,12 +266,12 @@ async function box(page, sel) {
   const roundAfter = await page.$eval('#roundCount', (el) => el.textContent.trim());
   check('点击下一个音 → 练习次数递增', roundBefore !== roundAfter, `${roundBefore} → ${roundAfter}`);
 
-  // 升降号开关
-  const accBefore = await page.$eval('#accidentalsToggle', (el) => el.checked);
+  // 升降号开关（按钮化：aria-pressed + .active 高亮）
+  const accBefore = await page.$eval('#accidentalsToggle', (el) => el.getAttribute('aria-pressed') === 'true' && el.classList.contains('active'));
   await page.click('#accidentalsToggle', { force: true });
   await page.waitForTimeout(150);
-  const accAfter = await page.$eval('#accidentalsToggle', (el) => el.checked);
-  check('升降号开关可切换', accBefore !== accAfter, `${accBefore} → ${accAfter}`);
+  const accAfter = await page.$eval('#accidentalsToggle', (el) => el.getAttribute('aria-pressed') === 'true' && el.classList.contains('active'));
+  check('升降号开关可切换（含高亮态）', accBefore !== accAfter, `${accBefore} → ${accAfter}`);
 
   // 查看模式：难度卡片禁用；点按模式：启用 + 高亮
   const browseDisabled = await page.$eval('#difficultyCard', (el) => el.classList.contains('disabled'));
