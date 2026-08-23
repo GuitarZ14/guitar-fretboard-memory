@@ -577,6 +577,28 @@ button { color: inherit; cursor: pointer; }
 .segmented button:hover::before { transform: scaleX(1); }
 .segmented button.active { color: #fff; }
 .segmented button.active::before { transform: scaleX(1); }
+
+/* 视图切换：两列并排大按钮 */
+.view-switch-two-col {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  padding: 5px;
+  gap: 6px;
+  border-radius: 16px;
+}
+.view-switch-two-col button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 8px 10px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.25;
+  text-align: center;
+  white-space: normal;
+}
 .segmented button:focus-visible { outline: 3px solid var(--purple-400); outline-offset: 2px; }
 
 /* ===================== 选择卡片 ===================== */

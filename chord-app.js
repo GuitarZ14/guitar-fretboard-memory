@@ -569,7 +569,7 @@ function buildVoicingSVG(v, type, tuning, opts = {}) {
       .sort((a, b) => a - b);
     const x1 = pad.l + cols[0] * colW + colW / 2;
     const x2 = pad.l + cols[cols.length - 1] * colW + colW / 2;
-    const y = pad.t + (f - start) * rowH + rowH / 2;
+    const y = pad.t + (f - start - 0.5) * rowH;
     parts.push(
       `<path d="M ${x1} ${y - 2} Q ${(x1 + x2) / 2} ${y - 6}, ${x2} ${y - 2}" fill="none" stroke="${DIAGRAM_COLORS.line}" stroke-width="1.6"/>`
     );
@@ -594,7 +594,7 @@ function buildVoicingSVG(v, type, tuning, opts = {}) {
       }
       return;
     }
-    const y = pad.t + (f - start) * rowH + rowH / 2;
+    const y = pad.t + (f - start - 0.5) * rowH;
     const isRoot = v.rootStrings.includes(si);
     const fill = isRoot ? DIAGRAM_COLORS.root : DIAGRAM_COLORS.tone;
     const r = isPicked ? 8 : 6;
@@ -816,7 +816,7 @@ function renderVoicings() {
     elements.resultKicker.textContent = "选音识别";
   } else {
     elements.diagramTitle.textContent = `${symbol} 的按法`;
-    elements.resultKicker.textContent = "推荐指法";
+    elements.resultKicker.textContent = "按和弦种类查找";
   }
 
   if (state.view === "voicing") {
@@ -830,7 +830,7 @@ function renderVoicings() {
       elements.voicingArea.innerHTML = `
         <div class="theory-desc" style="padding: 18px 4px; text-align: center;">
           当前调音下未找到合适的完整指法，
-          可切换到「全指板」视图查看所有可用位置。
+          可切换到「按指板音查找」查看所有可用位置。
         </div>`;
       elements.voicingHint.classList.remove("visible");
       elements.voicingHintText.textContent = "未找到";
