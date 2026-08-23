@@ -357,12 +357,16 @@ function scoreVoicing(v) {
   const openStrings = frets.filter((f) => f === 0).length;
   s += openStrings * 4; // 开放弦更经典，区分同分
 
-  s -= baseFret * 1.6;
+  // 偏好：低把位优先（把位越低分越高，权重加大，让低把位明显胜出）
+  s -= baseFret * 6;
   s -= span * 2.2;
 
-  if (baseFret <= 4 && (frets[0] === -1 || frets[0] === 0)) s += 12;
-  if (baseFret <= 4 && frets[0] > 0) s -= 8;
+  // 低把位整体加分；不再因为"6 弦是横按根音"而扣分（E 型横按也是标准、好按的把位）
+  if (baseFret <= 4) s += 14;
+  if (baseFret <= 4 && (frets[0] === -1 || frets[0] === 0)) s += 6;
   if (baseFret <= 4 && rootStrings.includes(1)) s += 6;
+  // 高把位（手指够不到、难按）明显降权
+  if (baseFret > 4) s -= (baseFret - 4) * 4;
   if (Math.max(frets[4], frets[5]) > 12) s -= 5;
 
   return s;
@@ -705,8 +709,15 @@ function extendedVoicings(typeId, rootSemitone, tuningPitches, opts = {}) {
   const open = [];
   const moveable = [];
 
-  // MUST KNOW：评分 top 3（不分 group）
-  for (const v of merged) {
+  // MUST KNOW：优先低把位（baseFret ≤ 4）里评分最高的，不足再补其它把位。
+  // 这样「推荐给用户看」的永远是低把位、4 根手指够得到的标准按法。
+  const lowPos = merged.filter((v) => v.baseFret <= 4);
+  const otherPos = merged.filter((v) => v.baseFret > 4);
+  for (const v of lowPos) {
+    if (must.length >= 3) break;
+    must.push(v);
+  }
+  for (const v of otherPos) {
     if (must.length >= 3) break;
     must.push(v);
   }
