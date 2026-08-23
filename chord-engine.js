@@ -295,42 +295,81 @@ function chordSymbol(root, type, mode) {
   return noteName(root, mode) + type.suffix;
 }
 
-/* ---------- 手指分配 ----------
- * frets: [6]，-1=不弹，0=空弦，>=1=品位。
- * 规则：品位相同的多弦组视为横按（食指 1），其余按品位从低到高分配 2/3/4。
+/* ---------- 可演奏性 / 手指分配 ----------
+ * 真实生理限制：一只手只能用 4 根按弦指（食指 1、中指 2、无名指 3、小指 4），
+ * 拇指仅背部支撑。同一根手指若要按多根弦，必须是：
+ *  - 同品位；且
+ *  - 这些弦之间没有被更低品位的发声弦隔断（否则手指会压到那根弦）。
+ * 唯一例外：最低品位的那一组允许跨弦（可做成“大横按/小横按”，手指可以
+ * 悬空越过更高品位的弦）。
+ *
+ * 返回值 { subgroups, fingers }：
+ *  - subgroups 是实际需要的手指组数；>4 即不可按。
+ *  - fingers 是按弦指编号数组，0 表示不弹或空弦。
  */
-function assignFingers(frets) {
+function buildFingering(frets) {
   const fingers = frets.map(() => 0);
-  const pressed = [];
-  frets.forEach((f, si) => {
-    if (f > 0) pressed.push([si, f]);
-  });
-  if (pressed.length === 0) return fingers;
+  const pressed = frets
+    .map((f, si) => (f > 0 ? [si, f] : null))
+    .filter(Boolean);
+  if (pressed.length === 0) return { subgroups: 0, fingers };
 
   const groups = new Map();
   pressed.forEach(([si, f]) => {
     if (!groups.has(f)) groups.set(f, []);
     groups.get(f).push(si);
   });
-  const sorted = [...groups.entries()].sort((a, b) => a[0] - b[0]);
-  if (sorted.length > 4) return fingers;
+  const sortedFrets = [...groups.keys()].sort((a, b) => a - b);
+  const minFret = sortedFrets[0];
 
-  const barre = sorted.find(([, sis]) => sis.length >= 2);
-  let finger = 1;
-  if (barre) {
-    barre[1].forEach((si) => {
-      fingers[si] = 1;
-    });
-    finger = 2;
+  const subgroups = [];
+
+  for (const f of sortedFrets) {
+    const sis = groups.get(f).sort((a, b) => a - b);
+
+    // 最低品位：整组视为一个横按/小横按单位（手指可越过更高品位的弦）
+    if (f === minFret) {
+      subgroups.push({ fret: f, strings: sis });
+      continue;
+    }
+
+    // 更高品位：只有连续、中间没有更低品位发声弦的才能被同一根手指按住
+    let cur = [sis[0]];
+    for (let i = 1; i < sis.length; i += 1) {
+      const prev = sis[i - 1];
+      const curr = sis[i];
+      let broken = false;
+      for (let s = prev + 1; s < curr; s += 1) {
+        if (frets[s] >= 0 && frets[s] < f) {
+          broken = true;
+          break;
+        }
+      }
+      if (broken) {
+        subgroups.push({ fret: f, strings: cur });
+        cur = [curr];
+      } else {
+        cur.push(curr);
+      }
+    }
+    subgroups.push({ fret: f, strings: cur });
   }
-  sorted.forEach(([f, sis]) => {
-    if (barre && f === barre[0]) return;
-    sis.forEach((si) => {
-      fingers[si] = finger;
-    });
+
+  // 分配手指：从低到高，同品位从左到右
+  let finger = 1;
+  for (const sg of subgroups) {
+    for (const si of sg.strings) fingers[si] = finger;
     finger += 1;
-  });
-  return fingers;
+  }
+  return { subgroups: subgroups.length, fingers };
+}
+
+function assignFingers(frets) {
+  return buildFingering(frets).fingers;
+}
+
+function isPlayableFingering(frets) {
+  return buildFingering(frets).subgroups <= 4;
 }
 
 /* ---------- 指法评分 ----------
@@ -490,6 +529,8 @@ function transposedShapes(typeId, targetRoot, tuningPitches, opts = {}) {
         }
       }
       if (rootStrings.length === 0) continue;
+      // 真人手型过滤：超过 4 根手指无法按
+      if (!isPlayableFingering(newFrets)) continue;
 
       const cand = {
         frets: newFrets,
@@ -626,6 +667,8 @@ function generateCaged(typeId, root, tuningPitches) {
         if (f >= 0 && mod12(tuningPitches[si] + f) === root) rootStrings.push(si);
       });
       if (rootStrings.length === 0) continue;
+      // 真人手型过滤：超过 4 根手指无法按
+      if (!isPlayableFingering(frets)) continue;
 
       const cand = {
         frets,
@@ -717,7 +760,8 @@ function findVoicings(root, type, tuningPitches, opts = {}) {
         const fs = played.filter((p) => p[1] > 0).map((p) => p[1]);
         const span = fs.length ? Math.max(...fs) - Math.min(...fs) : 0;
         if (span > maxSpan) continue;
-        if (new Set(fs).size > 4) continue;
+        // 真人手型过滤：超过 4 根手指无法按
+        if (!isPlayableFingering(frets)) continue;
 
         const rootStrings = played
           .filter(([si, f]) => mod12(pitches[si] + f) === root)
