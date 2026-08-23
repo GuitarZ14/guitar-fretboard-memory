@@ -417,6 +417,8 @@ button { color: inherit; cursor: pointer; }
   box-shadow: var(--shadow-clay-sm);
   transition: opacity .7s ease, filter .3s ease, box-shadow .3s ease, border-color .3s ease;
 }
+/* 自由找音模式开关始终可点，用于从查看模式一键进入点按模式 */
+.difficulty-card .switch { pointer-events: auto; }
 /* 练习模式下高亮难度卡片，标识其当前可操作 */
 .control-card.highlight {
   border-color: rgba(178, 162, 222, 0.95);
@@ -460,17 +462,18 @@ button { color: inherit; cursor: pointer; }
 .switch input { position: absolute; opacity: 0; pointer-events: none; }
 .switch-track {
   display: block; width: 46px; height: 26px; padding: 3px;
-  background: var(--surface); border: var(--clay-border); border-radius: var(--radius-pill);
-  box-shadow: inset 3px 3px 6px rgba(0, 0, 0, 0.08), inset -3px -3px 6px rgba(255, 255, 255, 0.9);
+  background: var(--surface); border: 1px solid rgba(140, 140, 160, 0.35); border-radius: var(--radius-pill);
+  box-shadow: inset 3px 3px 6px rgba(0, 0, 0, 0.1), inset -2px -2px 5px rgba(255, 255, 255, 0.85);
   transition: background .2s ease, border-color .2s ease;
 }
 .switch-thumb {
   display: block; width: 18px; height: 18px; background: #ffffff;
-  border-radius: 50%; transition: transform .2s ease, background .2s ease;
-  box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.18);
+  border: 1px solid rgba(120, 120, 140, 0.25); border-radius: 50%;
+  transition: transform .2s ease, background .2s ease;
+  box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.2);
 }
-.switch input:checked + .switch-track { background: var(--surface-mint); border-color: rgba(255, 255, 255, 0.6); }
-.switch input:checked + .switch-track .switch-thumb { transform: translateX(16px); background: #ffffff; }
+.switch input:checked + .switch-track { background: var(--surface-mint); border-color: rgba(255, 255, 255, 0.7); }
+.switch input:checked + .switch-track .switch-thumb { transform: translateX(16px); background: #ffffff; border-color: rgba(255,255,255,0.5); }
 .switch input:focus-visible + .switch-track { outline: 3px solid var(--purple-400); outline-offset: 2px; }
 
 .setting-row {

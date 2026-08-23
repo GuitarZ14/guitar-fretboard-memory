@@ -375,6 +375,7 @@ const elements = {
   instruction: document.querySelector("#instruction"),
   sectionKicker: document.querySelector("#sectionKicker"),
   autoRevealToggle: document.querySelector("#autoRevealToggle"),
+  difficultyToggle: document.querySelector("#difficultyToggle"),
   autoRevealAtSeconds: document.querySelector("#autoRevealAtSeconds"),
   autoRevealHoldSeconds: document.querySelector("#autoRevealHoldSeconds"),
   autoRevealSetting: document.querySelector("#autoRevealSetting"),
@@ -508,16 +509,27 @@ function ensureValidNote() {
   }
   if (Array.isArray(state.noteQueue) && state.noteQueue.length > 0) {
     state.note = state.noteQueue.shift();
-  } else {
-    const pool = state.mode === "practice" ? getPracticeNotes() : getActiveNotes();
-    state.note = createShuffledGroup(state.note, pool.length > 0 ? pool : NOTES)[0] || NOTES[0];
+    return state.note;
   }
+  const pool = state.mode === "practice" ? getPracticeNotes() : getActiveNotes();
+  if (pool.length === 0 && state.mode === "practice") {
+    // 点按模式下题库为空（范围无解），不应从全部音名中 fallback 出题，
+    // 否则 currentNote 会显示一个虚假题目，导致用户点击后被误判。
+    state.note = null;
+    return null;
+  }
+  state.note = createShuffledGroup(state.note, pool.length > 0 ? pool : NOTES)[0] || NOTES[0];
   return state.note;
 }
 
 function updateMatches() {
   const note = ensureValidNote();
   document.querySelectorAll(".answer-note").forEach((marker) => {
+    if (!note) {
+      marker.classList.remove("match");
+      marker.textContent = "";
+      return;
+    }
     const matches = marker.dataset.pitch === note.pitch;
     marker.classList.toggle("match", matches);
     marker.textContent = matches ? note.display : "";
@@ -525,7 +537,14 @@ function updateMatches() {
 }
 
 function renderCurrentNote() {
-  const display = ensureValidNote().display;
+  const note = ensureValidNote();
+  if (!note) {
+    // 范围无解时清空当前音名，避免显示误导性题目
+    elements.currentNote.textContent = "—";
+    elements.noteCard.classList.remove("accidental");
+    return;
+  }
+  const display = note.display;
   if (display.length > 1) {
     const base = display[0];
     const accidental = display.slice(1);
@@ -647,14 +666,19 @@ function clearCellFeedback() {
 
 function startQuestion() {
   if (state.mode !== "practice") return;
+  const note = ensureValidNote();
+  if (!note) {
+    // 题库为空（范围无解），不进入 pending 答题状态
+    state.practice.phase = "done";
+    return;
+  }
   state.practice.phase = "pending";
   state.practice.firstClick = true;
   state.practice.wrongInQuestion = 0;
   state.practice.foundStrings = new Set();
-  state.practice.targetStrings = getTargetStrings();
+  state.practice.targetStrings = getTargetStrings(note);
   clearCellFeedback();
   setAnswerVisible(false);
-  const note = ensureValidNote();
   const targetCount = state.practice.targetStrings.size;
   const status = targetCount > 1
     ? `在指板上找出 ${note.display} 的位置（需找 ${targetCount} 处）`
@@ -674,10 +698,14 @@ function countSkip() {
 
 function onCellClick(cell) {
   if (!cell || !cell.dataset) return;
-  if (state.mode !== "practice" || state.practice.phase !== "pending" || state.summaryOpen) {
+  if (state.mode !== "practice" || state.practice.phase !== "pending" || state.summaryOpen || !state.note) {
     // 如果当前不在可答题状态，给用户一点反馈，便于排查
     if (state.mode === "practice" && state.practice.phase === "done" && !state.summaryOpen) {
-      setAnswerStatus("本题已作答，请点击「下一题」继续");
+      if (state.note) {
+        setAnswerStatus("本题已作答，请点击「下一题」继续");
+      } else {
+        setAnswerStatus("在选定范围内没有相同的音，请扩大品格区间或重新勾选弦组后再开始。");
+      }
     }
     return;
   }
@@ -818,8 +846,11 @@ function startPracticeRound() {
       window.alert("在选定范围内没有相同的音");
     }
     state.practice.started = false;
+    state.practice.phase = "done"; // 防止点击被当作 pending 题目评分
     state.practice.roundTotal = 0;
     state.noteQueue = [];
+    state.note = null; // 清空当前音名，避免显示虚假题目
+    renderCurrentNote();
     updateDimmedCells(); // 同步将指板全部灰化，呈现「默认全灰」状态
     updateStats();
     return;
@@ -908,6 +939,9 @@ function setMode(mode) {
   elements.practiceModeTab.classList.toggle("active", mode === "practice");
   elements.browseModeTab.setAttribute("aria-selected", String(mode === "browse"));
   elements.practiceModeTab.setAttribute("aria-selected", String(mode === "practice"));
+  if (elements.difficultyToggle) {
+    elements.difficultyToggle.checked = mode === "practice";
+  }
   elements.fretboard.classList.toggle("practice", mode === "practice");
   elements.practiceStats.hidden = mode !== "practice";
   elements.instruction.textContent =
@@ -1090,6 +1124,11 @@ elements.accidentalsToggle.addEventListener("click", () => {
 
 elements.browseModeTab.addEventListener("click", () => setMode("browse"));
 elements.practiceModeTab.addEventListener("click", () => setMode("practice"));
+if (elements.difficultyToggle) {
+  elements.difficultyToggle.addEventListener("change", () => {
+    setMode(elements.difficultyToggle.checked ? "practice" : "browse");
+  });
+}
 elements.fretRangeMinInput.addEventListener("input", onFretRangeInput);
 elements.fretRangeMaxInput.addEventListener("input", onFretRangeInput);
 

@@ -9,7 +9,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="styles.css?v=23" />
+    <link rel="stylesheet" href="styles.css?v=24" />
   </head>
   <body>
     <main class="app-shell">
@@ -119,6 +119,11 @@
                   <h2>自由找音模式</h2>
                   <p>设定出题的弦组与品格区间</p>
                 </div>
+                <label class="switch">
+                  <input id="difficultyToggle" type="checkbox" />
+                  <span class="switch-track"><span class="switch-thumb"></span></span>
+                  <span class="sr-only">开启自由找音模式</span>
+                </label>
               </div>
               <div class="fret-range-slider" role="group" aria-label="品格范围选择">
                 <div class="range-values" aria-live="polite">
@@ -218,7 +223,7 @@
       </div>
     </div>
 
-    <script src="app.js?v=18"></script>
+    <script src="app.js?v=19"></script>
     <script>
       // 滚动触发入场动画：进入视口时添加 .in-view（播放一次）
       (function () {
