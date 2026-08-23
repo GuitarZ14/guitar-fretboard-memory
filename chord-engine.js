@@ -544,7 +544,8 @@ const CAGED_TEMPLATES = {
   major: {
     C: [null, 0, 4, 7, 0, 7],
     A: [null, 0, 7, 0, 4, 7],
-    G: [7, null, 7, 0, 4, 7],
+    // G 型使用完整开放 G 大形：根音在 6 弦与 1 弦（如 C 的 G 型为 8-7-5-5-5-8）
+    G: [0, 4, 7, 0, 4, 0],
     E: [0, 7, 0, 4, 7, 0],
     D: [null, null, 0, 7, 0, 4],
   },
@@ -584,7 +585,9 @@ function generateCaged(typeId, root, tuningPitches) {
 
     let best = null;
     // 遍历根弦可能按的品位（0=空弦 ~ 15）
+    // 强制：根弦在该品位必须真的发出目标根音，避免形状被错误压低到非根弦上
     for (let r = 0; r <= 15; r += 1) {
+      if (mod12(tuningPitches[rootStr] + r) !== root) continue;
       const frets = tpl.map((deg, si) => {
         if (deg === null) return -1; // 不发声
         if (si === rootStr) return r; // 根弦就按在 r
