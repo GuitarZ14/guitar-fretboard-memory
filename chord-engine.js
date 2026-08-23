@@ -602,27 +602,40 @@ const CAGED_TEMPLATES = {
     E: [0, 7, 0, 3, 7, 0],
     D: [null, null, 0, 7, 0, 3],
   },
-  // 属七：在大小三和弦基础上加入 b7(10)，仅给最实用的 E 型 / A 型横按
+  // 属七：E/A 为常用横按；C/G/D 型使用含空弦/高位根音的经典形态
   "7": {
-    E: [0, 7, 10, 4, 7, 0],
+    C: [null, 0, 4, 7, 10, 4],
     A: [null, 0, 7, 10, 4, 7],
+    G: [0, 10, 7, 0, 4, 0],
+    E: [0, 7, 10, 4, 7, 0],
+    D: [null, null, 0, 4, 7, 10],
   },
-  // 大七：加入大七(11)
+  // 大七：五型俱全（C/G/D 型可含空弦）
   maj7: {
-    E: [0, 7, 11, 4, 7, 0],
+    C: [null, 0, 4, 7, 11, 4],
     A: [null, 0, 7, 11, 4, 7],
+    G: [0, 4, 7, 0, 11, 4],
+    E: [0, 7, 11, 4, 7, 0],
+    D: [null, null, 0, 7, 11, 4],
   },
-  // 小七：加入 b7(10)，三音为小三(3)
+  // 小七：E/A 为常用横按；C/G/D 型选取可弹的延伸形态
   m7: {
-    E: [0, 7, 10, 3, 7, 0],
+    C: [null, 0, 3, 10, 3, 10],
     A: [null, 0, 7, 10, 3, 7],
+    G: [0, 10, 7, 0, 3, 0],
+    E: [0, 7, 10, 3, 7, 0],
+    D: [null, null, 0, 3, 7, 10],
   },
 };
 
 function generateCaged(typeId, root, tuningPitches) {
   const tpls = CAGED_TEMPLATES[typeId];
   if (!tpls) return [];
+  const type = CHORD_TYPE_MAP[typeId];
+  if (!type) return [];
+  const chordSet = new Set(type.intervals.map((i) => mod12(root + i)));
   const out = [];
+
   for (const shape of Object.keys(tpls)) {
     const tpl = tpls[shape];
     const rootStr = tpl.indexOf(0); // 根音所在弦（0-based，6→1 对应 0→5）
@@ -630,66 +643,79 @@ function generateCaged(typeId, root, tuningPitches) {
 
     let best = null;
     // 遍历根弦可能按的品位（0=空弦 ~ 15）
-    // 强制：根弦在该品位必须真的发出目标根音，避免形状被错误压低到非根弦上
     for (let r = 0; r <= 15; r += 1) {
       if (mod12(tuningPitches[rootStr] + r) !== root) continue;
-      const frets = tpl.map((deg, si) => {
-        if (deg === null) return -1; // 不发声
-        if (si === rootStr) return r; // 根弦就按在 r
-        // 其它弦：需要发出的音 = root + deg；在该弦上取「与 r 同把位、最接近 r」的品位（±6 品内）
+
+      // 为每根非根弦收集所有在 0..15 内能发出目标音的品位候选（含空弦）。
+      // 这样 CAGED 的开放形态（如 G 型 8-7-5-5-0-0）不会被「最近根音把位」规则错过。
+      const candidates = tpl.map((deg, si) => {
+        if (deg === null) return [-1]; // 闷弦
+        if (si === rootStr) return [r];
         const need = mod12(root + deg);
-        const open = mod12(tuningPitches[si]);
-        let off = mod12(need - (open + r)); // 相对 r 的偏移（0..11）
-        // 取最接近 r 的等价偏移（落在 -6..+6），保证把位紧凑、跨度小
-        if (off > 6) off -= 12;
-        let f = r + off;
-        // 若越界，尝试另一个八度
-        if (f > 15) f -= 12;
-        if (f < 0) f += 12;
-        return f;
+        const cands = [];
+        for (let f = 0; f <= 15; f += 1) {
+          if (mod12(tuningPitches[si] + f) === need) cands.push(f);
+        }
+        return cands.length ? cands : [-1];
       });
-      // 校验：所有发声弦必须在 0..15，且跨度 ≤4
-      const pressed = frets.filter((f) => f > 0);
-      const allOk = frets.every((f) => f === -1 || (f >= 0 && f <= 15));
-      if (!allOk) continue;
-      const minF = Math.min(...frets.filter((f) => f >= 0));
-      const maxF = Math.max(...frets.filter((f) => f >= 0));
-      const span = maxF - minF;
-      if (span > 4) continue;
-      // 校验每个发声音确实是和弦音（度数模板本身保证，这里再兜底）
-      const type = CHORD_TYPE_MAP[typeId];
-      const set = new Set(type.intervals.map((i) => mod12(root + i)));
-      const notesOk = frets.every((f, si) => {
-        if (f < 0) return true;
-        return set.has(mod12(tuningPitches[si] + f));
-      });
-      if (!notesOk) continue;
 
-      const baseFret = pressed.length ? minF : 0;
-      const rootStrings = [];
-      frets.forEach((f, si) => {
-        if (f >= 0 && mod12(tuningPitches[si] + f) === root) rootStrings.push(si);
-      });
-      if (rootStrings.length === 0) continue;
-      // 注：CAGED 形状按「度数模板 + 最近把位」生成，本身合法；
-      // 少数形状（如小三和弦 C 型）跨度虽可用、但实际偏难按，仍保留展示。
+      // 组合搜索候选品位，取按弦跨度 ≤4 且手指可分配的最佳结果
+      const stack = [{ idx: 0, frets: [] }];
+      while (stack.length) {
+        const cur = stack.pop();
+        if (cur.idx === 6) {
+          const frets = cur.frets;
+          const played = frets.filter((f) => f >= 0);
+          const pressed = frets.filter((f) => f > 0);
+          if (played.length < 3 || pressed.length === 0) continue;
 
-      const cand = {
-        frets,
-        baseFret,
-        span,
-        rootStrings,
-        fingers: assignFingers(frets),
-        group: classifyVoicing({ frets, baseFret }, true),
-        label: `${shape} 型`,
-        cageShape: shape,
-        source: "caged",
-      };
-      // 取把位最低（优先含空弦的开放形态）
-      const score = baseFret * 10 + (frets.includes(0) ? -1 : 0);
-      if (!best || score < best._s) {
-        cand._s = score;
-        best = cand;
+          const pressedFrets = pressed;
+          const minF = Math.min(...pressedFrets);
+          const maxF = Math.max(...pressedFrets);
+          const span = maxF - minF;
+          if (span > 4) continue;
+
+          // 校验每个发声音都是和弦音
+          const notesOk = frets.every((f, si) => {
+            if (f < 0) return true;
+            return chordSet.has(mod12(tuningPitches[si] + f));
+          });
+          if (!notesOk) continue;
+
+          const rootStrings = [];
+          frets.forEach((f, si) => {
+            if (f >= 0 && mod12(tuningPitches[si] + f) === root) rootStrings.push(si);
+          });
+          if (rootStrings.length === 0) continue;
+
+          // 手指必须 ≤4 组；少数 CAGED 形状本身偏难（如小三和弦 C 型），
+          // 但仍属理论/参考形态，这里保留展示。
+          if (!isPlayableFingering(frets)) continue;
+
+          const baseFret = minF;
+          const openCount = frets.filter((f) => f === 0).length;
+          // 评分：低把位优先，空弦奖励，跨度小奖励
+          const score = baseFret * 10 - openCount * 3 + span * 2;
+          const cand = {
+            frets,
+            baseFret,
+            span,
+            rootStrings,
+            fingers: assignFingers(frets),
+            group: classifyVoicing({ frets, baseFret }, true),
+            label: `${shape} 型`,
+            cageShape: shape,
+            source: "caged",
+          };
+          if (!best || score < best._s) {
+            cand._s = score;
+            best = cand;
+          }
+          continue;
+        }
+        for (const f of candidates[cur.idx]) {
+          stack.push({ idx: cur.idx + 1, frets: cur.frets.concat(f) });
+        }
       }
     }
     if (best) {
