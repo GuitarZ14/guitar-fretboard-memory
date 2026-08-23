@@ -438,19 +438,22 @@ function buildFretboard() {
       cell.dataset.stringIndex = String(stringIndex + 1);
       cell.dataset.fret = String(fret);
 
+      const pitchName = CHROMATIC[(string.pitch + fret) % 12];
+      cell.dataset.pitch = pitchName;
+
       if (fret === 0) {
+        // 空弦位置用 string-label 显示音名，不再创建 answer-note，避免显示答案时重复渲染
         const label = document.createElement("span");
         label.className = "string-label";
         label.textContent = string.name;
+        label.dataset.pitch = pitchName;
         cell.append(label);
+      } else {
+        const answer = document.createElement("span");
+        answer.className = "answer-note";
+        answer.dataset.pitch = pitchName;
+        cell.append(answer);
       }
-
-      const pitchName = CHROMATIC[(string.pitch + fret) % 12];
-      cell.dataset.pitch = pitchName;
-      const answer = document.createElement("span");
-      answer.className = "answer-note";
-      answer.dataset.pitch = pitchName;
-      cell.append(answer);
 
       elements.fretboard.append(cell);
     }
@@ -524,15 +527,26 @@ function ensureValidNote() {
 
 function updateMatches() {
   const note = ensureValidNote();
-  document.querySelectorAll(".answer-note").forEach((marker) => {
+  document.querySelectorAll(".fret-cell").forEach((cell) => {
+    const marker = cell.querySelector(".answer-note");
     if (!note) {
-      marker.classList.remove("match");
-      marker.textContent = "";
+      cell.classList.remove("match");
+      if (marker) {
+        marker.classList.remove("match");
+        marker.textContent = "";
+      }
       return;
     }
-    const matches = marker.dataset.pitch === note.pitch;
-    marker.classList.toggle("match", matches);
-    marker.textContent = matches ? note.display : "";
+    const matches = cell.dataset.pitch === note.pitch;
+    const isOpen = Number(cell.dataset.fret) === 0;
+    // 空弦位置：不显示 answer-note，而是通过 cell.match 高亮 string-label
+    // 非空弦位置：answer-note 显示音名圆点
+    if (isOpen) {
+      cell.classList.toggle("match", matches);
+    } else if (marker) {
+      marker.classList.toggle("match", matches);
+      marker.textContent = matches ? note.display : "";
+    }
   });
 }
 

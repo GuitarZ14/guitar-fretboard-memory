@@ -259,6 +259,10 @@ async function box(page, sel) {
   const matchCount = await page.$$eval('.fretboard.show-answer .answer-note.match', (els) => els.length);
   check('指板显示答案圆点（匹配点 > 0）', matchCount > 0, 'match=' + matchCount);
 
+  // 空弦位置本身已有 string-label 显示音名，不应再重复渲染 answer-note
+  const openAnswerNotes = await page.$$eval('.fret-cell.open .answer-note', (els) => els.length);
+  check('空弦位置不重复显示 answer-note', openAnswerNotes === 0, 'count=' + openAnswerNotes);
+
   // 下一个音（轮次递增）
   const roundBefore = await page.$eval('#roundCount', (el) => el.textContent.trim());
   await page.click('#nextButton');

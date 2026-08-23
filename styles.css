@@ -900,6 +900,19 @@ button { color: inherit; cursor: pointer; }
 }
 .fretboard.show-answer .answer-note.match { opacity: 1; transform: scale(1); }
 
+/* 空弦位置：当前音等于空弦音时，不再创建/显示 answer-note（避免与 string-label 重复），
+   仅通过 cell.match 高亮 string-label，保持界面简洁 */
+.fret-cell.open.match {
+  background: rgba(152, 255, 152, 0.42);
+  box-shadow: inset 0 0 0 2px rgba(47, 164, 90, 0.55), 0 0 10px rgba(47, 164, 90, 0.28);
+}
+.fret-cell.open.match .string-label {
+  background: linear-gradient(145deg, #4ade80, #22c55e);
+  color: #fff;
+  border-color: rgba(21, 128, 61, 0.55);
+  box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.35);
+}
+
 /* 练习模式：限定品格区间之外的格子淡化 */
 .fret-cell.dimmed { opacity: 0.28; pointer-events: none; }
 
@@ -952,6 +965,12 @@ button { color: inherit; cursor: pointer; }
 .fret-cell.hit .answer-note.match {
   opacity: 1;
   transform: scale(1);
+}
+/* 空弦位置点击正确后同样高亮 string-label（无 answer-note） */
+.fret-cell.hit .string-label {
+  outline: 3px solid #fff;
+  outline-offset: 1px;
+  box-shadow: 0 0 0 4px rgba(47, 164, 90, 0.5);
 }
 
 /* 真实品点标记（已写入 app.js，置于指板格子内） */
