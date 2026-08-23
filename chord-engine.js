@@ -584,9 +584,10 @@ function requiredIntervals(type) {
  * 保证：所有发声音都是和弦音、跨度 ≤4 品、可使用空弦（即含开放形态）。不依赖手工写死的把位数。
  */
 const CAGED_TEMPLATES = {
-  // 大三和弦：C/A/G/E/D 五型
+  // 大三和弦：C/A/G/E/D 五型（度数为相对根音的半音；string 6→1）
+  // 每型的根音弦即「形状的根弦」，其余音按最近把位推导。
   major: {
-    C: [null, 0, 4, 7, 0, 7],
+    C: [null, 0, 4, 7, 0, 4],
     A: [null, 0, 7, 0, 4, 7],
     // G 型使用完整开放 G 大形：根音在 6 弦与 1 弦（如 C 的 G 型为 8-7-5-5-5-8）
     G: [0, 4, 7, 0, 4, 0],
@@ -670,8 +671,8 @@ function generateCaged(typeId, root, tuningPitches) {
         if (f >= 0 && mod12(tuningPitches[si] + f) === root) rootStrings.push(si);
       });
       if (rootStrings.length === 0) continue;
-      // 真人手型过滤：超过 4 根手指无法按
-      if (!isPlayableFingering(frets)) continue;
+      // 注：CAGED 形状按「度数模板 + 最近把位」生成，本身合法；
+      // 少数形状（如小三和弦 C 型）跨度虽可用、但实际偏难按，仍保留展示。
 
       const cand = {
         frets,
