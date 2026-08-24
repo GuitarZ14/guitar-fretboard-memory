@@ -46,6 +46,7 @@
   let drawing = null; // 当前正在绘制的标注
   let pointers = new Map(); // pointerId -> {x,y}
   let lastPinchDist = 0;
+  let pinchCenter = { x: 0, y: 0 }; // 双指（或滚轮）缩放焦点，屏幕坐标
   let shotSel = null; // 截图框选 {x0,y0,x1,y1}（canvas 本地坐标）
   let eraserPreview = null; // 橡皮擦预览圆心（canvas 本地坐标）
 
@@ -208,6 +209,49 @@
   /* ---------- 尺寸与适配 ---------- */
   let cloneW = 1000;
   let cloneH = 300;
+
+  function clampScale(s) {
+    return Math.max(0.4, Math.min(6, s));
+  }
+
+  // 以屏幕坐标 (sx, sy) 为焦点缩放：保持该点在缩放前后屏幕位置不变
+  function zoomAround(sx, sy, ratio) {
+    const sRect = stage.getBoundingClientRect();
+    const stageCx = sRect.left + sRect.width / 2;
+    const stageCy = sRect.top + sRect.height / 2;
+    const newScale = baseScale * userScale * ratio;
+    // 当前 stageInner 变换：screen = stageC + (local + pan) * scale
+    // 令焦点本地点不变，缩放后其屏幕位置仍为 (sx, sy)：
+    //   sx = stageCx + (lx + panX_new) * newScale  =>  panX_new = (sx - stageCx)/newScale - lx
+    //   其中 lx = (sx - stageCx)/(oldScale) - panX
+    const oldScale = baseScale * userScale;
+    const lx = (sx - stageCx) / oldScale - panX;
+    const ly = (sy - stageCy) / oldScale - panY;
+    panX = (sx - stageCx) / newScale - lx;
+    panY = (sy - stageCy) / newScale - ly;
+  }
+
+  // 工具：将屏幕坐标转为 stageInner 本地坐标（基于当前变换）
+  function screenToLocal(sx, sy) {
+    const sRect = stage.getBoundingClientRect();
+    const stageCx = sRect.left + sRect.width / 2;
+    const stageCy = sRect.top + sRect.height / 2;
+    const ox = sx - stageCx;
+    const oy = sy - stageCy;
+    return {
+      x: ox / (baseScale * userScale) - panX,
+      y: oy / (baseScale * userScale) - panY,
+    };
+  }
+  // 工具：将 stageInner 本地坐标转为屏幕坐标
+  function localToScreen(lx, ly) {
+    const sRect = stage.getBoundingClientRect();
+    const stageCx = sRect.left + sRect.width / 2;
+    const stageCy = sRect.top + sRect.height / 2;
+    const ox = (lx + panX) * (baseScale * userScale);
+    const oy = (ly + panY) * (baseScale * userScale);
+    return { x: stageCx + ox, y: stageCy + oy };
+  }
 
   function getClone() {
     return stageInner.querySelector("svg, .fretboard, .fretboard-grid") || stageInner.firstElementChild;
@@ -374,7 +418,13 @@
   function onPointerDown(e) {
     pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
     if (pointers.size === 2) {
+      const pts = Array.from(pointers.values());
       lastPinchDist = pinchDistance();
+      // 记录双指中心（屏幕坐标），作为缩放焦点，确保缩放前后该点屏幕位置不变
+      pinchCenter = {
+        x: (pts[0].x + pts[1].x) / 2,
+        y: (pts[0].y + pts[1].y) / 2,
+      };
       drawing = null; // 多指时取消当前绘制，进入平移/缩放
       return;
     }
@@ -408,11 +458,22 @@
 
     if (pointers.size === 2) {
       const d = pinchDistance();
+      const pts = Array.from(pointers.values());
+      const curCenter = {
+        x: (pts[0].x + pts[1].x) / 2,
+        y: (pts[0].y + pts[1].y) / 2,
+      };
       if (lastPinchDist > 0) {
-        const cx = (stage.getBoundingClientRect().width - canvas.getBoundingClientRect().width) / 2;
-        userScale = Math.max(0.4, Math.min(6, userScale * (d / lastPinchDist)));
-        applyTransform();
+        const newScale = clampScale(userScale * (d / lastPinchDist));
+        zoomAround(pinchCenter.x, pinchCenter.y, newScale / userScale);
+        userScale = newScale;
       }
+      // 双指整体平移：以两指中心移动量更新平移（屏幕坐标差 → 本地坐标差），使焦点跟随手指移动
+      const scale = baseScale * userScale;
+      panX += (curCenter.x - pinchCenter.x) / scale;
+      panY += (curCenter.y - pinchCenter.y) / scale;
+      pinchCenter = curCenter;
+      applyTransform();
       lastPinchDist = d;
       return;
     }
@@ -654,9 +715,15 @@
   function onWheel(e) {
     e.preventDefault();
     const factor = e.deltaY < 0 ? 1.1 : 0.9;
-    userScale = Math.max(0.4, Math.min(6, userScale * factor));
+    zoomAround(e.clientX, e.clientY, factor);
+    userScale = clampScale(userScale * factor);
     applyTransform();
   }
+
+  // 将内部坐标变换/测试工具暴露（仅测试用）
+  window.FretboardAnnotate = window.FretboardAnnotate || {};
+  window.FretboardAnnotate._screenToLocal = screenToLocal;
+  window.FretboardAnnotate._localToScreen = localToScreen;
 
   // 窗口尺寸变化时重新适配
   function onResize() {
@@ -665,10 +732,10 @@
   }
   window.addEventListener("resize", onResize);
 
-  window.FretboardAnnotate = {
+  window.FretboardAnnotate = Object.assign(window.FretboardAnnotate || {}, {
     open,
     close,
     // 仅供测试：返回当前标注数量
     _strokeCount: () => state.strokes.length,
-  };
+  });
 })();
