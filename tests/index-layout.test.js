@@ -244,6 +244,18 @@ async function box(page, sel) {
   check('矮视口三栏均铺满宽度', slBox.w > 200 && srBox.w > 200 && snBox.w > 200, `L.w=${slBox.w.toFixed(0)} R.w=${srBox.w.toFixed(0)} N.w=${snBox.w.toFixed(0)}`);
 
 
+  // ============ 平板布局：琴弦间距加大，降低误触 ============
+  await page.setViewportSize({ width: 1024, height: 1366 });
+  await page.reload({ waitUntil: 'networkidle' });
+  await page.waitForSelector('.fretboard');
+  await page.waitForTimeout(500);
+
+  console.log('\n[平板布局 1024×1366]');
+  const tabletRows = await page.$eval('.fretboard', (el) => getComputedStyle(el).gridTemplateRows);
+  const rowHeights = tabletRows.split(' ').map(parseFloat).filter((n) => n > 0);
+  const minRowH = rowHeights.length ? Math.min.apply(null, rowHeights) : 0;
+  check('平板设备琴弦间距显著加大（行高 ≥ 58px）', minRowH >= 58, 'gridTemplateRows=' + tabletRows);
+
   // ============ 功能测试（桌面视口） ============
   await page.setViewportSize({ width: 1280, height: 900 });
   await page.reload({ waitUntil: 'networkidle' });

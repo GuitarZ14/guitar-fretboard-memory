@@ -1195,6 +1195,12 @@ kbd { padding: 3px 6px; color: var(--text-2); background: var(--surface); border
   .practice-stats { margin-bottom: 8px; }
 }
 
+/* 平板/触控设备优化：显著加大琴弦间距，降低误触 */
+@media (min-width: 768px) and (max-width: 1366px),
+       (hover: none) and (pointer: coarse) and (min-width: 768px) {
+  .fretboard { grid-template-rows: repeat(6, 60px); }
+}
+
 /* 矮视口 — 手机：进一步压缩以容纳指板于首屏 */
 @media (max-height: 780px) and (max-width: 760px) {
   .app-shell { margin-top: 8px; padding-bottom: 10px; }
