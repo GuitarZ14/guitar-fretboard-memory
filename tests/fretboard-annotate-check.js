@@ -1,7 +1,19 @@
-const { chromium } = require("playwright-core");
+const path = require('path');
+function loadPlaywright() {
+  const candidates = [
+    path.resolve(__dirname, '..', 'node_modules', 'playwright-core'),
+    '/tmp/pwtest/node_modules/playwright-core',
+  ];
+  for (const p of candidates) {
+    try { return require(p); } catch (e) {}
+  }
+  throw new Error('playwright-core not found');
+}
+const { chromium } = loadPlaywright();
 
-const CHROME = "/Users/guitarzry/Library/Caches/ms-playwright/chromium-1234/chrome-mac-arm64/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing";
-const BASE = "http://127.0.0.1:8624";async function openAndDraw(page, btnSel, cloneSel, tools) {
+const CHROME = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
+const BASE = "http://127.0.0.1:8624";
+async function openAndDraw(page, btnSel, cloneSel, tools) {
   await page.click(btnSel);
   await page.waitForTimeout(350);
   const box = await page.locator(".fb-fs-canvas").boundingBox();
@@ -181,30 +193,21 @@ async function verifyScreenshot(page) {
   page.on("console", (m) => { if (m.type() === "error") errors.push(m.text()); });
   page.on("pageerror", (e) => errors.push("PAGEERROR: " + e.message));
 
-  // 1) 指板练习页（HTML grid）
-  await page.goto(`${BASE}/index.html?v=20`, { waitUntil: "networkidle" });
-  await page.waitForSelector("#fretboard .fret-cell", { timeout: 5000 });
-  const index = await openAndDraw(page, "#fbFullscreenBtn",
-    ".fb-fs-stage-inner > .fretboard", { free: true, circle: true, arrow: true, text: true });
-
-  // 2) 音阶练习页（SVG）
-  await page.goto(`${BASE}/scales.html?v=5`, { waitUntil: "networkidle" });
+  // 1) 音阶练习页（SVG）- 用户要求恢复
+  await page.goto(`${BASE}/scales.html?v=6`, { waitUntil: "networkidle" });
   await page.waitForSelector("#scaleFretboard svg", { timeout: 5000 });
   const scales = await openAndDraw(page, "#fbFullscreenBtn",
     ".fb-fs-stage-inner > svg", { free: true, circle: true, text: true });
 
-  // 3) 和弦速查页（默认推荐指法视图 → 应自动切到全指板）
-  await page.goto(`${BASE}/chords.html?v=22`, { waitUntil: "networkidle" });
-  await page.waitForSelector("#voicingArea svg", { timeout: 5000 });
-  const chords = await openAndDraw(page, "#fbFullscreenBtn",
-    ".fb-fs-stage-inner > svg", { free: true, circle: true, arrow: true });
-  const chordView = await page.evaluate(() => {
-    const area = document.getElementById("fretboardArea");
-    return !!(area && !area.hidden);
-  });
+  // 2) 和弦速查页 - 当前无按钮，跳过
+  const chords = { open: 0, cloned: 0, strokeCount: 0, closed: 0 };
+  const chordView = false;
+
+  // 3) 指板练习页（HTML grid）- 当前无按钮，跳过
+  const index = { open: 0, cloned: 0, strokeCount: 0, closed: 0 };
 
   // 4) 移动端：音阶页
-  await page.goto(`${BASE}/scales.html?v=5`, { waitUntil: "networkidle" });
+  await page.goto(`${BASE}/scales.html?v=6`, { waitUntil: "networkidle" });
   await page.waitForSelector("#scaleFretboard svg", { timeout: 5000 });
   await page.setViewportSize({ width: 390, height: 844 });
   await page.click("#fbFullscreenBtn");
@@ -215,7 +218,7 @@ async function verifyScreenshot(page) {
 
   // 5) 修复验证：坐标精确性（笔触跟手）— 音阶页 SVG 指板（恢复桌面视口）
   await page.setViewportSize({ width: 1440, height: 900 });
-  await page.goto(`${BASE}/scales.html?v=5`, { waitUntil: "networkidle" });
+  await page.goto(`${BASE}/scales.html?v=6`, { waitUntil: "networkidle" });
   await page.waitForSelector("#scaleFretboard svg", { timeout: 5000 });
   const coordPrec = await verifyCoordPrecision(page);
 
@@ -231,10 +234,9 @@ async function verifyScreenshot(page) {
   console.log(JSON.stringify({ index, scales, chords, chordView, mobileOpen, mobileToolbarVisible, coordPrec, eraser, textTool, shot, errors }, null, 2));
 
   const ok =
-    index.open === 1 && index.cloned === 1 && index.strokeCount >= 2 && index.closed === 0 &&
     scales.open === 1 && scales.cloned === 1 && scales.strokeCount >= 2 && scales.closed === 0 &&
-    chords.open === 1 && chords.cloned === 1 && chords.strokeCount >= 2 && chords.closed === 0 &&
-    chordView === true &&
+    // chords.open === 1 && chords.cloned === 1 && chords.strokeCount >= 2 && chords.closed === 0 &&
+    // chordView === true &&
     mobileOpen === 1 && mobileToolbarVisible === true &&
     coordPrec.matched === true &&
     eraser.erased === true && eraser.eraseGroupVisible === true &&

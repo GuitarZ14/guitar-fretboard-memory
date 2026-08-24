@@ -10,8 +10,8 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="chord-styles.css?v=13" />
-    <link rel="stylesheet" href="scale-styles.css?v=5" />
-    <link rel="stylesheet" href="fretboard-fullscreen.css?v=1" />
+    <link rel="stylesheet" href="scale-styles.css?v=6" />
+    <link rel="stylesheet" href="fretboard-fullscreen.css?v=2" />
   </head>
   <body>
     <main class="app-shell">
@@ -131,6 +131,9 @@
                   <span class="play-icon" aria-hidden="true">▶</span>
                   <span class="play-label">播放音阶</span>
                 </button>
+                <button class="fb-fullscreen-btn brutal-shadow brutal-shadow-hover" id="fbFullscreenBtn" type="button" aria-label="全屏标注">
+                  全屏标注
+                </button>
                 <div class="fretboard-label-switch">
                   <span class="fretboard-label-title">标注</span>
                   <div class="segmented" id="labelSwitch" role="group" aria-label="指板标注方式">
@@ -202,8 +205,22 @@
     </main>
 
     <script src="chord-engine.js?v=3"></script>
-    <script src="scale-app.js?v=8"></script>
+    <script src="scale-app.js?v=9"></script>
+    <script src="fretboard-annotate.js?v=2"></script>
     <script>
+      // 全屏标注入口
+      (function () {
+        var btn = document.getElementById('fbFullscreenBtn');
+        if (!btn || !window.FretboardAnnotate) return;
+        btn.addEventListener('click', function () {
+          var svg = document.querySelector('#scaleFretboard svg');
+          if (!svg) return;
+          var titleEl = document.getElementById('scaleName');
+          var title = titleEl ? titleEl.textContent.trim() : '音阶在指板上的分布';
+          window.FretboardAnnotate.open(svg, title);
+        });
+      })();
+
       // 滚动触发入场动画：进入视口时添加 .in-view（播放一次）
       (function () {
         var nodes = document.querySelectorAll('.reveal');
