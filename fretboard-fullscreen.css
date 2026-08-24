@@ -165,9 +165,25 @@
   transform-origin: center center;
   will-change: transform;
 }
-.fb-fs-stage-inner svg { display: block; }
 
-/* 标注画布覆盖在指板克隆之上 */
+/* 可标注画板：大于指板克隆，覆盖舞台主要区域，上下方空白区也可标注 */
+.fb-fs-board {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+}
+.fb-fs-board svg,
+.fb-fs-board .fretboard,
+.fb-fs-board .fretboard-grid {
+  display: block;
+  max-width: none;
+  max-height: none;
+  flex-shrink: 0;
+}
+
+/* 标注画布覆盖整个可标注画板 */
 .fb-fs-canvas {
   position: absolute;
   inset: 0;

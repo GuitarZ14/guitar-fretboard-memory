@@ -24,6 +24,7 @@
   let overlay = null;
   let stage = null;
   let stageInner = null;
+  let board = null;     // 可标注画板（大于指板克隆，覆盖舞台主要区域）
   let canvas = null;
   let ctx = null;
   let textInput = null;
@@ -34,6 +35,8 @@
   let userScale = 1; // 用户捏合缩放
   let panX = 0;
   let panY = 0;
+  let boardW = 1000; // 可标注画板宽度
+  let boardH = 600;  // 可标注画板高度
 
   const state = {
     tool: "free",
@@ -97,9 +100,12 @@
 
     stage = overlay.querySelector("#fbFsStage");
     stageInner = overlay.querySelector("#fbFsStageInner");
+    board = document.createElement("div");
+    board.className = "fb-fs-board";
+    stageInner.appendChild(board);
     canvas = document.createElement("canvas");
     canvas.className = "fb-fs-canvas";
-    stageInner.appendChild(canvas);
+    board.appendChild(canvas);
     ctx = canvas.getContext("2d");
 
     // 工具
@@ -163,11 +169,11 @@
     overlay.classList.add("open");
     document.body.style.overflow = "hidden";
 
-    // 克隆指板 SVG
-    stageInner.querySelectorAll("svg, .fb-fs-canvas").forEach((n) => { if (n !== canvas) n.remove(); });
+    // 克隆指板 SVG 到可标注画板中
+    board.querySelectorAll("svg, .fretboard, .fretboard-grid").forEach((n) => n.remove());
     const clone = sourceSvg.cloneNode(true);
     clone.removeAttribute("id");
-    stageInner.insertBefore(clone, canvas);
+    board.insertBefore(clone, canvas);
 
     // 重置状态
     state.strokes = [];
@@ -254,14 +260,14 @@
   }
 
   function getClone() {
-    return stageInner.querySelector("svg, .fretboard, .fretboard-grid") || stageInner.firstElementChild;
+    return board.querySelector("svg, .fretboard, .fretboard-grid") || board.firstElementChild;
   }
 
   function sizeCanvas() {
     dpr = window.devicePixelRatio || 1;
-    // 画布在 stageInner 本地坐标系内尺寸 = clone 自然尺寸；外层 CSS transform 负责缩放
-    canvas.width = Math.max(1, Math.round(cloneW * dpr));
-    canvas.height = Math.max(1, Math.round(cloneH * dpr));
+    // 画布尺寸与可标注画板一致，覆盖舞台主要区域（含指板上下方空白）
+    canvas.width = Math.max(1, Math.round(boardW * dpr));
+    canvas.height = Math.max(1, Math.round(boardH * dpr));
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   }
 
@@ -277,20 +283,22 @@
     cloneH = rect.height || cloneH;
     const sRect = stage.getBoundingClientRect();
     const pad = 0.96;
-    baseScale = Math.min((sRect.width * pad) / cloneW, (sRect.height * pad) / cloneH);
-    // 先按真实克隆尺寸重建画布位图，再应用变换
+    // 可标注画板铺满舞台，使用户能在指板上下方空白区也进行标注
+    boardW = Math.round(sRect.width * pad);
+    boardH = Math.round(sRect.height * pad);
+    board.style.width = boardW + "px";
+    board.style.height = boardH + "px";
+    // 画板已按舞台尺寸设置，基础缩放为 1；用户双指/滚轮在 1 的基础上缩放
+    baseScale = 1;
     sizeCanvas();
     applyTransform();
   }
 
   function applyTransform() {
     const scale = baseScale * userScale;
-    stageInner.style.width = cloneW + "px";
-    stageInner.style.height = cloneH + "px";
+    stageInner.style.width = boardW + "px";
+    stageInner.style.height = boardH + "px";
     stageInner.style.transform = `translate(${panX}px, ${panY}px) scale(${scale})`;
-    // 画布覆盖在 clone 上（同坐标系）
-    canvas.style.width = cloneW + "px";
-    canvas.style.height = cloneH + "px";
     redraw();
   }
 
@@ -666,13 +674,18 @@
 
     const scale = Math.max(2, window.devicePixelRatio || 1); // 高分辨率导出
     const off = document.createElement("canvas");
-    off.width = Math.max(1, Math.round(cloneW * scale));
-    off.height = Math.max(1, Math.round(cloneH * scale));
+    // 导出画布使用可标注画板尺寸，指板克隆居中绘制
+    off.width = Math.max(1, Math.round(boardW * scale));
+    off.height = Math.max(1, Math.round(boardH * scale));
     const octx = off.getContext("2d");
     octx.setTransform(scale, 0, 0, scale, 0, 0);
 
     rasterizeFretboard().then((img) => {
-      if (img) octx.drawImage(img, 0, 0, cloneW, cloneH);
+      if (img) {
+        const dx = (boardW - cloneW) / 2;
+        const dy = (boardH - cloneH) / 2;
+        octx.drawImage(img, dx, dy, cloneW, cloneH);
+      }
 
       // 标注单独一层绘制（橡皮擦 destination-out 只擦标注），再与指板合成
       const anno = document.createElement("canvas");

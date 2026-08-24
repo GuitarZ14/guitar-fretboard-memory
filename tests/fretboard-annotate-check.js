@@ -197,7 +197,7 @@ async function verifyScreenshot(page) {
   await page.goto(`${BASE}/scales.html?v=6`, { waitUntil: "networkidle" });
   await page.waitForSelector("#scaleFretboard svg", { timeout: 5000 });
   const scales = await openAndDraw(page, "#fbFullscreenBtn",
-    ".fb-fs-stage-inner > svg", { free: true, circle: true, text: true });
+    ".fb-fs-board > svg", { free: true, circle: true, text: true });
 
   // 2) 和弦速查页 - 当前无按钮，跳过
   const chords = { open: 0, cloned: 0, strokeCount: 0, closed: 0 };
