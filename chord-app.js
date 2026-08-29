@@ -987,27 +987,52 @@ function voicingBassPc(v, tuning) {
   return null;
 }
 
-// 枚举所有 type × root(root ∈ pickedSet) 且和弦包含用户所有已选音（可含额外音）的匹配
+// 枚举所有 type × root 且和弦包含用户所有已选音（可含额外音）的匹配。
+// 当已选音 ≥3 个时，root 取 0–11 全部 12 个音高：这样既能找到根音在已选音中的常规/转位和弦，
+// 也能找到根音未选、已选音作为三/五/七/九音等的和弦解释（如 {E,G,Bb} → C7）。
+// 当已选音 <3 个时，为避免结果过载，只把已选音本身作为候选根音。
 function findMatchingChords(pickedSet) {
   const matches = [];
   if (pickedSet.size === 0) return matches;
+  const pickedArr = [...pickedSet];
+  const comprehensive = pickedSet.size >= 3;
+  const roots = comprehensive ? [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11] : pickedArr;
   for (const type of CHORD_TYPES) {
     const ivals = type.intervals.map((i) => mod12(i)); // 相对根音的音程
-    for (const root of pickedSet) {
+    for (const root of roots) {
       const chordSet = ivals.map((iv) => mod12(root + iv));
       // 和弦必须包含用户所有已选音（可含额外音）
-      if (![...pickedSet].every((s) => chordSet.includes(s))) continue;
+      if (!pickedArr.every((s) => chordSet.includes(s))) continue;
       const extra = chordSet.filter((s) => !pickedSet.has(s)); // 多余音
-      matches.push({ root, typeId: type.id, type, semis: chordSet, extraCount: extra.length });
+      // 统计已选音分别落在该和弦的哪些级数上，用于排序（覆盖根/三/五/七等越重要越优先）
+      const coveredDegrees = pickedArr
+        .map((s) => ivals.indexOf(mod12(s - root)))
+        .filter((idx) => idx >= 0);
+      const degreeWeight = coveredDegrees.reduce((sum, idx) => sum + (ivals.length - idx), 0);
+      matches.push({
+        root,
+        typeId: type.id,
+        type,
+        semis: chordSet,
+        extraCount: extra.length,
+        rootInPicked: pickedSet.has(root) ? 1 : 0,
+        degreeWeight,
+      });
     }
   }
-  // 排序：多余音最少（与用户选音最贴合）→ 同多余数时 3 音先于 4 音 → 按 type.id
-  matches.sort((a, b) => a.extraCount - b.extraCount || a.type.intervals.length - b.type.intervals.length || a.typeId.localeCompare(b.typeId));
+  // 排序：根音在已选音中优先 → 多余音最少（与用户选音最贴合）→ 已选音落在更重要级数 → 同多余数时 3 音先于 4 音 → 按 type.id
+  matches.sort((a, b) =>
+    b.rootInPicked - a.rootInPicked ||
+    a.extraCount - b.extraCount ||
+    b.degreeWeight - a.degreeWeight ||
+    a.type.intervals.length - b.type.intervals.length ||
+    a.typeId.localeCompare(b.typeId)
+  );
   return matches;
 }
 
 // 取匹配 (root, typeId) 的最佳 voicing：优先与用户已选位置重合（详情页直观高亮）→
-// root position 优先 → pickedSet 中非根低音的转位 → fallback
+// 根音在已选音中时优先 root position；根音未选时优先用已选音作低音的转位/斜线和弦 → fallback
 function pickMatchingVoicing(root, typeId, pickedSet, tuning, pickedPositions = []) {
   const groups = extendedVoicings(typeId, root, tuning.pitches);
   const all = [...groups.must, ...groups.open, ...groups.moveable];
@@ -1023,37 +1048,37 @@ function pickMatchingVoicing(root, typeId, pickedSet, tuning, pickedPositions = 
     }
     return n;
   }
-  // 1) 同等根音位置中，找命中已选最多的（直观映射）
-  const rootPosList = all.filter((v) => voicingBassPc(v, tuning) === root);
-  if (rootPosList.length) {
-    let best = rootPosList[0], bestScore = scoreVoicing(best);
-    for (const v of rootPosList) {
+  function pickBest(list) {
+    let best = list[0], bestScore = scoreVoicing(best);
+    for (const v of list) {
       const s = scoreVoicing(v);
       if (s > bestScore) { bestScore = s; best = v; }
     }
-    if (bestScore > 0) return best; // 至少要命中一处，否则继续
     return best;
   }
-  // 2) 用 pickedSet 中非根低音的转位
-  const transposed = all.filter((v) => {
+
+  const rootInPicked = pickedSet.has(root);
+
+  // 1) 根音在已选音中：优先 root position（最自然的按法）
+  if (rootInPicked) {
+    const rootPosList = all.filter((v) => voicingBassPc(v, tuning) === root);
+    if (rootPosList.length) return pickBest(rootPosList);
+  }
+
+  // 2) 根音未在已选音中（如 {E,G,Bb} → C7）：优先用已选音作低音的转位/斜线和弦，
+  //    直观展示「已选音是该和弦的某个组成音」这一关系。
+  const slashList = all.filter((v) => {
     const b = voicingBassPc(v, tuning);
     return b !== null && pickedSet.has(b);
   });
-  if (transposed.length) {
-    let best = transposed[0], bestScore = scoreVoicing(best);
-    for (const v of transposed) {
-      const s = scoreVoicing(v);
-      if (s > bestScore) { bestScore = s; best = v; }
-    }
-    return best;
-  }
-  // 3) fallback：取命中数最多的
-  let best = all[0], bestScore = scoreVoicing(best);
-  for (const v of all) {
-    const s = scoreVoicing(v);
-    if (s > bestScore) { bestScore = s; best = v; }
-  }
-  return best;
+  if (slashList.length) return pickBest(slashList);
+
+  // 3) fallback：root position（即使根音未选，也给出标准按法）
+  const rootPosList = all.filter((v) => voicingBassPc(v, tuning) === root);
+  if (rootPosList.length) return pickBest(rootPosList);
+
+  // 4) 最后 fallback：取命中数最多的任意按法
+  return pickBest(all);
 }
 
 // 切换（添加/移除）指板上的一个选音；同步 pickedNotes
